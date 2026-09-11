@@ -127,7 +127,7 @@ flowchart TD
 
 | 层 | 候选方案 | 说明 |
 | --- | --- | --- |
-| **后端** | Rust（axum/actix）优先；备选 Node.js/TypeScript | 高性能、类型安全 |
+| **后端** | Rust（axum/actix）或 Node.js/TypeScript | 高性能、类型安全 |
 | **前端** | React / Vue / Svelte（待定） | 组件化、生态成熟 |
 | **数据库** | PostgreSQL / SQLite（待定） | 关系型，适合结构化课程数据 |
 | **ICS 生成** | 服务端生成 或 前端生成（待定） | 需讨论 |
