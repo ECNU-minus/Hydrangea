@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## 项目名称
-课程查询与选课排课系统（course-plus）
+课程查询与选课排课系统（Hydrangea）
 
 ## 项目概述
 一个帮助用户**查询课程、标记意向、排定课表、导出课表**的 Web 应用。核心功能包括：
@@ -34,7 +34,7 @@
 - **后端**：Node.js + TypeScript + NestJS + better-sqlite3 + SQLite（WAL 模式）。
 - **前端**：Vue 3 + TypeScript + Vite + Pinia，UI 风格 Material You（MD3）。
 - **爬虫**：Python 独立脚本，**独立仓库**，与后端仅通过共享 SQLite 文件解耦。
-- **仓库结构**：本仓库为 pnpm workspaces monorepo（`apps/web` + `apps/server`），**不设共享包**，接口契约以 `docs/DESIGN.md` 第 4 章为准。
+- **仓库结构**：本仓库为 pnpm workspaces monorepo（`apps/web` + `apps/server`），**不设共享包**，接口契约以 `docs/DESIGN.md` 第 4 章为准。**仓库名与文件夹名一致（`Hydrangea`）**。
 - **已确定**：ICS 由**前端生成**；图片导出由**前端 Canvas 手绘**渲染为 PNG；排课码为**压缩文本**，通过**剪贴板**导出；用户数据存浏览器 IndexedDB（`idb` 封装）；部署采用 Docker Compose。
 - 详细设计见 `docs/DESIGN.md`（含第 12 章「项目结构」）。
 

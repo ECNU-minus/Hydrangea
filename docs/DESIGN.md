@@ -1,4 +1,4 @@
-# 课程查询与选课排课系统（course-plus）设计文档
+# 课程查询与选课排课系统（Hydrangea）设计文档
 
 ## 变更记录
 
@@ -11,14 +11,14 @@
 | v1.1 | 2026-09-17 | Niazye | 同步 PRD-formal v1.8：明确方案管理是**排课页副栏的一部分**（不在搜索页显示）；修正 §5.1/§5.2/§5.6/§11 D-12/§2.1 相关表述；同步修正 §4.3.3 API 响应 schedule 每段 location/weeks、§8.4 compute_masks 每段周次并集、syllabus_id 命名注释 |
 | v1.2 | 2026-09-17 | Niazye | 同步 PRD-formal v1.11：筛选条件限定为四项（§4.3.2/§4.3.3/§5.4）；培养层次选项固定为三个（§4.3.2）；占位条目来源扩展为导入与后端数据变更两种，已排标记一并移除（§3.2.4/§6.4/§9.5）；节次空档不可排课（§12.1） |
 | v1.3 | 2026-09-17 | Niazye | **精简去冗**：删除原第 11 章「设计决策清单」（决策已散落各章节，D-08 待定项并入 §6.5）；合并测试用例与验收清单为单一表格（§10.2）；删除术语对照表；合并重复表格与段落（§1.1、§2.3.4、§3.2.4、§4.3.6、§5.1、§5.5/§5.6、§6.4）；章节重编号（附录→第 11 章） |
-| v1.4 | 2026-09-17 | Niazye | 新增第 12 章「项目结构」：确定 pnpm workspaces monorepo（web + server）、爬虫为**独立仓库**、不设 `packages/shared`（类型各自维护，契约以第 4 章为准） |
+| v1.4 | 2026-09-17 | Niazye | 新增第 12 章「项目结构」：确定 pnpm workspaces monorepo（web + server）、爬虫为**独立仓库**、不设 `packages/shared`（类型各自维护，契约以第 4 章为准）；**仓库名与文件夹名统一为 `Hydrangea`** |
 
-| 项目名称 | 课程查询与选课排课系统（course-plus） |
+| 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
 | 文档版本 | v1.4 |
 | 编写日期 | 2026-09-17 |
 | 文档状态 | 正式版，已定稿 |
-| 依据文档 | `docs/PRD-formal.md` v1.11 |
+| 依据文档 | `docs/PRD-formal.md` v1.12 |
 | 目标读者 | 设计、前后端开发、测试 |
 
 > **说明**：本文档为**正式设计文档**，所有设计决策均已拍板（唯一例外为排课码格式，见 §6.5）。若需变更已定决策，请更新本文档并递增版本号，同时同步 `docs/PRD-formal.md` 的变更记录。
@@ -867,7 +867,7 @@ function toggleScheduled(key: string) {
 CP1-<base64url(payload)>
 ```
 
-- **前缀** `CP1`：`CP` = course-plus，`1` = 格式版本。
+- **前缀** `CP1`：`CP` = course-plus（项目代号），`1` = 格式版本。
 - **payload**：二进制结构，经 **Base64URL** 编码（无 `+` `/` `=`，便于 URL 与剪贴板传输）。
 
 **payload 二进制结构**：
@@ -956,10 +956,10 @@ flowchart TD
 ```ics
 BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//course-plus//CN
+PRODID:-//Hydrangea//CN
 CALSCALE:GREGORIAN
 BEGIN:VEVENT
-UID:202501-undergrad-2025A0001@course-plus
+UID:202501-undergrad-2025A0001@hydrangea
 DTSTAMP:20260917T000000Z
 DTSTART;TZID=Asia/Shanghai:20260908T080000
 DTEND;TZID=Asia/Shanghai:20260908T093500
@@ -1255,7 +1255,7 @@ flowchart LR
 
 ### 11.2 参考
 
-- `docs/PRD-formal.md` **v1.11**（唯一权威需求文档）
+- `docs/PRD-formal.md` **v1.12**（唯一权威需求文档）
 - [iCalendar 规范 (RFC 5545)](https://datatracker.ietf.org/doc/html/rfc5545)
 - [Base64URL (RFC 4648 §5)](https://datatracker.ietf.org/doc/html/rfc4648#section-5)
 - [SQLite JSON1 扩展](https://www.sqlite.org/json1.html)
@@ -1268,15 +1268,17 @@ flowchart LR
 
 | 仓库 | 内容 | 说明 |
 | --- | --- |
-| **本仓库**（`course-plus`） | 前端 + 后端 + 文档 | pnpm workspaces monorepo |
+| **本仓库**（`Hydrangea`） | 前端 + 后端 + 文档 | pnpm workspaces monorepo；**仓库名与文件夹名一致** |
 | **爬虫仓库**（独立） | Python 爬虫脚本 | **独立仓库**，与后端仅通过 `data/course.db` 与 `semesters` 表解耦（§2.3.3） |
 
 > **已定**：爬虫**不放入本仓库**，避免 Python 依赖与 JS 工具链混杂；两仓库通过**共享 SQLite 文件**协作，接口契约以 §3.1 表结构为准。
 
+> **命名约定**：仓库名与本地文件夹名**保持一致**（均为 `Hydrangea`），避免路径与文档引用不一致。
+
 ### 12.2 本仓库结构
 
 ```
-course-plus/
+Hydrangea/
 ├── AGENTS.md
 ├── README.md
 ├── docs/                        # PRD-formal.md（权威）、DESIGN.md、PRD.md（历史）
