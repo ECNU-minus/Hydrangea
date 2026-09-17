@@ -29,13 +29,14 @@
 - **课程大纲链接**：`https://byyt.ecnu.edu.cn/student/for-std/lesson-search/teaching-syllabus-zh/page/form/` + 课程 `id`（六位数字，**路径参数**）。该 `id` 与课程代码无关，需在爬取时一并获取。
 - **数据来源**：爬取学校站点 `https://byyt.ecnu.edu.cn/student/for-std/lesson-search/search/` + 学期六位数字路径参数；Cookie 手动获取；全量替换；支持多学期切换。
 
-## 架构与技术栈（初步偏好）
-- 采用 **B/S 架构**（前端通过 API 与后端通信），如果你认为 C/S 架构更合适可提出讨论，最终由用户决定。
-- **后端**：Rust/Node.js/TypeScript（未定）。
-- **前端**：未定（React/Vue/Svelte 等，待设计阶段讨论）。
-- **数据库**：未定（待设计阶段讨论）。
-- **已确定**：ICS 由**前端生成**；图片导出由**前端 Canvas/SVG 渲染**为 PNG；排课码为**压缩文本**，通过**剪贴板**导出。
-- 其他库（如 ICS 生成、Web 框架）在开发阶段按需选择。
+## 架构与技术栈（已定稿）
+- 采用 **B/S 架构**（前端通过 API 与后端通信）。
+- **后端**：Node.js + TypeScript + NestJS + better-sqlite3 + SQLite（WAL 模式）。
+- **前端**：Vue 3 + TypeScript + Vite + Pinia，UI 风格 Material You（MD3）。
+- **爬虫**：Python 独立脚本，**独立仓库**，与后端仅通过共享 SQLite 文件解耦。
+- **仓库结构**：本仓库为 pnpm workspaces monorepo（`apps/web` + `apps/server`），**不设共享包**，接口契约以 `docs/DESIGN.md` 第 4 章为准。
+- **已确定**：ICS 由**前端生成**；图片导出由**前端 Canvas 手绘**渲染为 PNG；排课码为**压缩文本**，通过**剪贴板**导出；用户数据存浏览器 IndexedDB（`idb` 封装）；部署采用 Docker Compose。
+- 详细设计见 `docs/DESIGN.md`（含第 12 章「项目结构」）。
 
 ## 协作模式（非常重要）
 用户将按照 **需求 → 设计 → 开发 → 测试 → 验收** 的顺序推进项目。你作为技术协作助手，**不直接代替用户完成所有工作**，而是：
@@ -88,10 +89,10 @@
 - 对于有争议的技术选型，列出至少两个方案并说明利弊，由用户决定。
 
 ## 项目当前状态
-- 仓库中仅有 `AGENTS.md` 与 `docs/`（`PRD.md`、`PRD-formal.md`）。
-- **需求阶段基本完成**：PRD-formal 为完整版，待评审；剩余待确认项见 PRD 第 10 章。
-- **尚未进入设计阶段**：技术栈、API、数据库、排课码格式均未定稿。
-- **尚未初始化任何代码**，无依赖、无目录结构，一切从零开始。
+- 仓库中仅有 `AGENTS.md` 与 `docs/`（`PRD.md`、`PRD-formal.md`、`DESIGN.md`）。
+- **需求阶段已完成**：PRD-formal v1.11 为唯一权威需求文档。
+- **设计阶段基本完成**：`docs/DESIGN.md` v1.4 已定稿（技术选型、数据模型、API、前端、排课码、导出、爬虫、部署、项目结构）；**仅排课码格式（D-08）待定**，见 DESIGN §6.5。
+- **尚未初始化任何代码**：无依赖、无目录结构，项目结构见 DESIGN 第 12 章。
 
 ## 其他说明
 - 如果项目结构或技术栈在开发过程中发生变化，请更新本文件以保持同步。
