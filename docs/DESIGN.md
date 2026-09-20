@@ -13,10 +13,11 @@
 | v1.3 | 2026-09-17 | Niazye | **精简去冗**：删除原第 11 章「设计决策清单」（决策已散落各章节，D-08 待定项并入 §6.5）；合并测试用例与验收清单为单一表格（§10.2）；删除术语对照表；合并重复表格与段落（§1.1、§2.3.4、§3.2.4、§4.3.6、§5.1、§5.5/§5.6、§6.4）；章节重编号（附录→第 11 章） |
 | v1.4 | 2026-09-17 | Niazye | 新增第 12 章「项目结构」：确定 pnpm workspaces monorepo（web + server）、爬虫为**独立仓库**、不设 `packages/shared`（类型各自维护，契约以第 4 章为准）；**仓库名与文件夹名统一为 `Hydrangea`** |
 | v1.5 | 2026-09-17 | Niazye | **排课码格式（D-08）拍板**：采用方案 A（自定义二进制 + Base64URL），§6.2 格式定义由「推荐方案」转为**正式定稿**，删除 §6.5 备选方案对比 |
+| v1.6 | 2026-09-21 | Niazye | **后端测试统一为 Vitest**：NestJS 后端测试框架由 Jest 改为 Vitest（与前端一致，§10.1/§12.4/§12.5）；精简 §10.1 测试层次表 |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
-| 文档版本 | v1.5 |
+| 文档版本 | v1.6 |
 | 编写日期 | 2026-09-17 |
 | 文档状态 | 正式版，已定稿 |
 | 依据文档 | `docs/PRD-formal.md` v1.12 |
@@ -1182,10 +1183,10 @@ flowchart LR
 
 ### 10.1 测试层次
 
-| 层次 | 范围 | 工具建议 |
+| 层次 | 范围 | 工具 |
 | --- | --- | --- |
-| 单元测试 | 冲突检测、课表生成、周次工具、排课码编解码、ICS 生成 | Vitest（前端）；Jest（NestJS 后端） |
-| 集成测试 | API 端点、筛选组合、分页 | Supertest + 测试数据库 |
+| 单元测试 | 冲突检测、课表生成、周次工具、排课码编解码、ICS 生成 | Vitest（前后端统一） |
+| 集成测试 | API 端点、筛选组合、分页 | Vitest + Supertest + 测试数据库 |
 | 端到端测试 | 完整用户流程 | Playwright |
 
 ### 10.2 关键测试用例
@@ -1389,7 +1390,7 @@ apps/server/
 │       ├── interceptors/cache.interceptor.ts  # Cache-Control: max-age=300
 │       └── mappers/class.mapper.ts            # DB 行 → API 响应：解析 schedule JSON、
 │                                              #   拼接 syllabusUrl、剔除筛选字段
-└── test/                        # Jest + Supertest 集成测试
+└── test/                        # Vitest + Supertest 集成测试
 ```
 
 **约束**：`class.mapper.ts` 负责**剔除** `courseType`/`courseNature`/`department`（筛选与展示分离，PRD 3.1.2）并拼接 `syllabusUrl`；后端**不提供任何写接口**。
@@ -1400,7 +1401,7 @@ apps/server/
 | --- | --- | --- |
 | `apps/web/src/core/__tests__/` | 冲突检测、课表生成、周次、标记级联 | Vitest |
 | `apps/web/src/codec/__tests__/` | 排课码编解码、ICS 生成 | Vitest |
-| `apps/server/test/` | API 端点、筛选组合、分页 | Jest + Supertest |
+| `apps/server/test/` | API 端点、筛选组合、分页 | Vitest + Supertest |
 | `e2e/` | 完整用户流程（§10.2 T-01~T-39） | Playwright |
 
 > 爬虫仓库的解析器测试（HTML fixture 离线）由该仓库自行维护。
