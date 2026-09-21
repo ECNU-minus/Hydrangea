@@ -1,0 +1,10 @@
+{
+  "name": "hydrangea",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:server": "pnpm --filter server start:dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  }
+}
