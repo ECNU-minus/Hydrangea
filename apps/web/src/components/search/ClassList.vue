@@ -2,8 +2,8 @@
 /** 搜索结果布局类型（DESIGN.md §4.5） */
 export type ClassListLayout = 'card' | 'table' | 'wide-table'
 
-/** 布局对页面容器的需求：normal = 标准容器（居中 1200px），wide = 占满整个页面 */
-export type LayoutContainer = 'normal' | 'wide'
+/** 布局对页面容器的需求：narrow = 窄容器（居中），normal = 标准容器（居中 1200px），wide = 占满整个页面 */
+export type LayoutContainer = 'narrow' | 'normal' | 'wide'
 
 /**
  * 各布局的容器需求元数据。
@@ -11,7 +11,7 @@ export type LayoutContainer = 'normal' | 'wide'
  * 新增布局时在此登记即可，App.vue 无需改动。
  */
 export const LAYOUT_META: Record<ClassListLayout, { container: LayoutContainer }> = {
-  card: { container: 'normal' },
+  card: { container: 'narrow' },
   table: { container: 'normal' },
   'wide-table': { container: 'wide' },
 }

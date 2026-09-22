@@ -8,7 +8,7 @@ import ClassList, { LAYOUT_META, type ClassListLayout } from './components/searc
 const SEMESTER = '2026-2027-1'
 
 /** 当前布局（暂固定，布局切换留待后续切片） */
-const layout = ref<ClassListLayout>('table')
+const layout = ref<ClassListLayout>('card')
 
 const params = ref<QueryClassesParams>({ semester: SEMESTER })
 const items = ref<ClassItem[]>([])
@@ -41,7 +41,7 @@ onMounted(() => load(params.value))
 </script>
 
 <template>
-  <div class="app" :class="{ 'app--wide': LAYOUT_META[layout].container === 'wide' }">
+  <div class="app" :class="`app--${LAYOUT_META[layout].container}`">
     <header class="app-header">
       <h1>Hydrangea · 课程查询</h1>
       <span class="semester">{{ SEMESTER }}</span>
@@ -64,9 +64,15 @@ onMounted(() => load(params.value))
 
 <style scoped>
 .app {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 16px;
+}
+
+/* 窄容器（卡片布局）：更窄的阅读宽度，居中 */
+.app--narrow {
+  max-width: 900px;
 }
 
 /* 宽表格布局：去除两侧空白，占满整个页面 */
@@ -108,7 +114,7 @@ onMounted(() => load(params.value))
 
 .layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }

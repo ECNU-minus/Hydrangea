@@ -55,6 +55,7 @@ defineProps<{
 
 <style scoped>
 .class-list {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -84,6 +85,8 @@ defineProps<{
 .course-name {
   font-weight: 600;
   color: var(--text-h);
+  min-width: 0;
+  word-break: break-word;
 }
 
 .course-code {
@@ -120,6 +123,8 @@ defineProps<{
 .row dd {
   margin: 0;
   color: var(--text-h);
+  min-width: 0;
+  word-break: break-word;
 }
 
 .card-footer {
