@@ -1,11 +1,27 @@
+<script lang="ts">
+/** 搜索结果布局类型（DESIGN.md §4.5） */
+export type ClassListLayout = 'card' | 'table' | 'wide-table'
+
+/** 布局对页面容器的需求：normal = 标准容器（居中 1200px），wide = 占满整个页面 */
+export type LayoutContainer = 'normal' | 'wide'
+
+/**
+ * 各布局的容器需求元数据。
+ * App.vue 据此决定容器样式，无需关心具体布局名。
+ * 新增布局时在此登记即可，App.vue 无需改动。
+ */
+export const LAYOUT_META: Record<ClassListLayout, { container: LayoutContainer }> = {
+  card: { container: 'normal' },
+  table: { container: 'normal' },
+  'wide-table': { container: 'wide' },
+}
+</script>
+
 <script setup lang="ts">
 import type { ClassItem } from '../../api/classes'
 import CardLayout from './layouts/CardLayout.vue'
 import TableLayout from './layouts/TableLayout.vue'
 import WideTableLayout from './layouts/WideTableLayout.vue'
-
-/** 搜索结果布局类型（DESIGN.md §4.5） */
-export type ClassListLayout = 'card' | 'table' | 'wide-table'
 
 defineProps<{
   items: ClassItem[]

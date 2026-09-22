@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { queryClasses, type ClassItem, type QueryClassesParams } from './api/classes'
 import SearchBar from './components/search/SearchBar.vue'
-import ClassList, { type ClassListLayout } from './components/search/ClassList.vue'
+import ClassList, { LAYOUT_META, type ClassListLayout } from './components/search/ClassList.vue'
 
 /** 当前学期（暂固定，学期切换留待后续切片） */
 const SEMESTER = '2026-2027-1'
@@ -41,7 +41,7 @@ onMounted(() => load(params.value))
 </script>
 
 <template>
-  <div class="app" :class="{ 'app--wide': layout === 'wide-table' }">
+  <div class="app" :class="{ 'app--wide': LAYOUT_META[layout].container === 'wide' }">
     <header class="app-header">
       <h1>Hydrangea · 课程查询</h1>
       <span class="semester">{{ SEMESTER }}</span>
