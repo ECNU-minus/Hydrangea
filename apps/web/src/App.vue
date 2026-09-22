@@ -53,7 +53,7 @@ onMounted(() => load(params.value))
         <p v-if="loading" class="hint">加载中…</p>
         <p v-else-if="error" class="hint error">{{ error }}</p>
         <p v-else-if="items.length === 0" class="hint">暂无搜索结果</p>
-        <ClassList v-else :items="items" />
+        <ClassList v-else :items="items" layout="card" />
       </main>
     </div>
   </div>
@@ -61,7 +61,7 @@ onMounted(() => load(params.value))
 
 <style scoped>
 .app {
-  /* max-width: 1200px; */
+  max-width: 1200px;
   margin: 0 auto;
   padding: 16px;
 }
