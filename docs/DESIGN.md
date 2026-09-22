@@ -7,10 +7,11 @@
 | v1.0 | 2026-09-21 | Niazye | 初稿创建。基于 PRD v1.1 与已确认的技术选型，完全重新设计 |
 | v1.1 | 2026-09-23 | Niazye | 搜索结果支持多布局共存：新增 `core/format.ts` 纯函数（格式化周次/时间），`components/search/layouts/` 存放各布局组件，`ClassList.vue` 作为布局门面按 `layout` 分发；新增 §4.5 搜索结果多布局 |
 | v1.2 | 2026-09-23 | Niazye | 新增 `wide-table` 宽表格布局：在表格基础上去除两侧空白、占满整个页面（`.app--wide` 容器不设 `max-width`）；§4.5 补充布局类型表 |
+| v1.3 | 2026-09-23 | Niazye | 布局元数据机制：`ClassList.vue` 导出 `LAYOUT_META` 声明各布局的容器需求（`normal`/`wide`），`App.vue` 据此决定容器样式，不再硬编码具体布局名，消除与布局类型的耦合 |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
-| 文档版本 | v1.2 |
+| 文档版本 | v1.3 |
 | 编写日期 | 2026-09-23 |
 | 文档状态 | 完整版，待评审 |
 | 目标读者 | 前后端开发、测试、运维 |
@@ -296,7 +297,9 @@ src/
 | `table` | 表格布局，受页面最大宽度（1200px）约束 |
 | `wide-table` | 宽表格布局，在表格基础上**去除两侧空白、占满整个页面**（`.app--wide` 容器不设 `max-width`） |
 
-**新增一种布局**：新建 `layouts/*.vue`（只接收 `items`，用 `core/format.ts` 格式化），并在 `ClassList.vue` 门面中注册一行分发即可，不影响其他布局与业务代码。
+**布局元数据（`LAYOUT_META`）**：`ClassList.vue` 导出 `LAYOUT_META` 映射，声明每种布局对页面容器的需求（`container: 'normal' | 'wide'`）。`App.vue` 据此决定容器样式（如 `wide` 时加 `.app--wide` 类占满页面），**无需关心具体布局名**，避免与具体布局类型耦合。
+
+**新增一种布局**：新建 `layouts/*.vue`（只接收 `items`，用 `core/format.ts` 格式化），在 `ClassList.vue` 门面中注册一行分发，并在 `LAYOUT_META` 登记容器需求即可，不影响其他布局与业务代码，`App.vue` 无需改动。
 
 **未来加切换**：只需在搜索页某处维护一个 `layout` 状态并传给 `ClassList`，无需改动各布局组件。
 
