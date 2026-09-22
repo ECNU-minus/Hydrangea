@@ -35,77 +35,84 @@ function formatSchedule(schedule: ClassItem['schedule']): string {
 </script>
 
 <template>
-  <div class="class-list">
-    <article v-for="item in items" :key="item.classCode" class="class-card">
-      <header class="card-header">
-        <span class="class-code">{{ item.classCode }}</span>
-        <span class="course-name">{{ item.courseName }}</span>
-        <span class="course-code">{{ item.courseCode }}</span>
-        <span class="hours-credits">{{ item.totalHours }}/{{ item.credits }}</span>
-      </header>
-
-      <dl class="card-body">
-        <div class="row">
-          <dt>教师</dt>
-          <dd>{{ item.teacher }}</dd>
-        </div>
-        <div class="row">
-          <dt>时间</dt>
-          <dd>{{ formatSchedule(item.schedule) }}</dd>
-        </div>
-        <div class="row">
-          <dt>周次</dt>
-          <dd>{{ formatWeeks(item.weeks) }}</dd>
-        </div>
-        <div class="row">
-          <dt>层次</dt>
-          <dd>{{ item.level }}</dd>
-        </div>
-        <div class="row">
-          <dt>教学组成</dt>
-          <dd>{{ item.teachingComposition }}</dd>
-        </div>
-        <div v-if="item.remark" class="row">
-          <dt>备注</dt>
-          <dd>{{ item.remark }}</dd>
-        </div>
-      </dl>
-
-      <footer class="card-footer">
-        <a :href="item.syllabusUrl" target="_blank" rel="noopener noreferrer">
-          课程大纲 ↗
-        </a>
-      </footer>
-    </article>
+  <div class="class-table-wrap">
+    <table class="class-table">
+      <thead>
+        <tr>
+          <th>教学班</th>
+          <th>课程代码</th>
+          <th>课程名称</th>
+          <th>学时/学分</th>
+          <th>教师</th>
+          <th>上课时间</th>
+          <th>周次</th>
+          <th>层次</th>
+          <th>教学组成</th>
+          <th>备注</th>
+          <th>大纲</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="item in items" :key="item.classCode">
+          <td class="class-code">{{ item.classCode }}</td>
+          <td class="mono">{{ item.courseCode }}</td>
+          <td class="course-name">{{ item.courseName }}</td>
+          <td class="mono">{{ item.totalHours }}/{{ item.credits }}</td>
+          <td>{{ item.teacher }}</td>
+          <td>{{ formatSchedule(item.schedule) }}</td>
+          <td>{{ formatWeeks(item.weeks) }}</td>
+          <td>{{ item.level }}</td>
+          <td>{{ item.teachingComposition }}</td>
+          <td class="remark">{{ item.remark }}</td>
+          <td>
+            <a :href="item.syllabusUrl" target="_blank" rel="noopener noreferrer">大纲 ↗</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
 
 <style scoped>
-.class-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.class-table-wrap {
+  overflow-x: auto;
 }
 
-.class-card {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 16px;
+.class-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.class-table th,
+.class-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.class-table th {
+  position: sticky;
+  top: 0;
   background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
 }
 
-.card-header {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
+.class-table tbody tr:hover {
+  background: var(--accent-bg, rgba(170, 59, 255, 0.05));
 }
 
 .class-code {
   font-family: var(--mono);
   font-weight: 600;
   color: var(--accent);
+  white-space: nowrap;
 }
 
 .course-name {
@@ -113,54 +120,23 @@ function formatSchedule(schedule: ClassItem['schedule']): string {
   color: var(--text-h);
 }
 
-.course-code {
+.mono {
   font-family: var(--mono);
   color: var(--text);
-  font-size: 0.9em;
+  white-space: nowrap;
 }
 
-.hours-credits {
-  margin-left: auto;
-  font-family: var(--mono);
+.remark {
   color: var(--text);
-  font-size: 0.9em;
+  max-width: 200px;
 }
 
-.card-body {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.row {
-  display: flex;
-  gap: 8px;
-  font-size: 0.95em;
-}
-
-.row dt {
-  flex: 0 0 64px;
-  color: var(--text);
-}
-
-.row dd {
-  margin: 0;
-  color: var(--text-h);
-}
-
-.card-footer {
-  margin-top: 8px;
-  text-align: right;
-}
-
-.card-footer a {
+.class-table a {
   color: var(--accent);
   text-decoration: none;
-  font-size: 0.9em;
 }
 
-.card-footer a:hover {
+.class-table a:hover {
   text-decoration: underline;
 }
 </style>
