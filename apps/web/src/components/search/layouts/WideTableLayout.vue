@@ -63,7 +63,6 @@ defineProps<{
   border-bottom: 1px solid var(--border);
   text-align: left;
   vertical-align: top;
-  white-space: normal;
   word-break: break-word;
 }
 
@@ -81,25 +80,32 @@ defineProps<{
   background: var(--accent-bg, rgba(170, 59, 255, 0.05));
 }
 
-.class-code {
-  font-family: var(--mono);
-  font-weight: 600;
-  color: var(--accent);
+/* 需要单行显示的列：教学班、课程代码、课程名称、学时/学分、教师、层次 */
+.class-table .class-code,
+.class-table .course-name,
+.class-table .mono,
+.class-table td:nth-child(5),
+.class-table td:nth-child(8) {
   white-space: nowrap;
 }
 
-.course-name {
+.class-table .class-code {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.class-table .course-name {
   font-weight: 600;
   color: var(--text-h);
 }
 
-.mono {
+.class-table .mono {
   font-family: var(--mono);
   color: var(--text);
-  white-space: nowrap;
 }
 
-.remark {
+.class-table .remark {
   color: var(--text);
   max-width: 200px;
 }

@@ -8,7 +8,7 @@ import ClassList, { LAYOUT_META, type ClassListLayout } from './components/searc
 const SEMESTER = '2026-2027-1'
 
 /** 当前布局（暂固定，布局切换留待后续切片） */
-const layout = ref<ClassListLayout>('card')
+const layout = ref<ClassListLayout>('table')
 
 const params = ref<QueryClassesParams>({ semester: SEMESTER })
 const items = ref<ClassItem[]>([])
