@@ -72,6 +72,19 @@ onMounted(() => load(params.value))
 /* 宽表格布局：去除两侧空白，占满整个页面 */
 .app--wide {
   max-width: none;
+  padding: 0;
+}
+
+.app--wide .app-header {
+  padding: 16px 16px 0;
+}
+
+.app--wide .layout {
+  padding: 0 0 16px;
+}
+
+.app--wide .sidebar {
+  margin-left: 16px;
 }
 
 .app-header {
