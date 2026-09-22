@@ -2,6 +2,7 @@
 import type { ClassItem } from '../../api/classes'
 import CardLayout from './layouts/CardLayout.vue'
 import TableLayout from './layouts/TableLayout.vue'
+import WideTableLayout from './layouts/WideTableLayout.vue'
 
 /** 搜索结果布局类型（DESIGN.md §4.5） */
 export type ClassListLayout = 'card' | 'table' | 'wide-table'
@@ -16,5 +17,6 @@ defineProps<{
 <template>
   <CardLayout v-if="layout === 'card'" :items="items" />
   <TableLayout v-else-if="layout === 'table'" :items="items" />
+  <WideTableLayout v-else-if="layout === 'wide-table'" :items="items" />
   <!-- 新增布局在此注册：<XxxLayout v-else-if="layout === 'xxx'" :items="items" /> -->
 </template>

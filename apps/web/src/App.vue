@@ -2,10 +2,13 @@
 import { onMounted, ref } from 'vue'
 import { queryClasses, type ClassItem, type QueryClassesParams } from './api/classes'
 import SearchBar from './components/search/SearchBar.vue'
-import ClassList from './components/search/ClassList.vue'
+import ClassList, { type ClassListLayout } from './components/search/ClassList.vue'
 
 /** 当前学期（暂固定，学期切换留待后续切片） */
 const SEMESTER = '2026-2027-1'
+
+/** 当前布局（暂固定，布局切换留待后续切片） */
+const layout = ref<ClassListLayout>('card')
 
 const params = ref<QueryClassesParams>({ semester: SEMESTER })
 const items = ref<ClassItem[]>([])
@@ -38,7 +41,7 @@ onMounted(() => load(params.value))
 </script>
 
 <template>
-  <div class="app">
+  <div class="app" :class="{ 'app--wide': layout === 'wide-table' }">
     <header class="app-header">
       <h1>Hydrangea · 课程查询</h1>
       <span class="semester">{{ SEMESTER }}</span>
@@ -53,7 +56,7 @@ onMounted(() => load(params.value))
         <p v-if="loading" class="hint">加载中…</p>
         <p v-else-if="error" class="hint error">{{ error }}</p>
         <p v-else-if="items.length === 0" class="hint">暂无搜索结果</p>
-        <ClassList v-else :items="items" layout="card" />
+        <ClassList v-else :items="items" :layout="layout" />
       </main>
     </div>
   </div>
@@ -64,6 +67,11 @@ onMounted(() => load(params.value))
   max-width: 1200px;
   margin: 0 auto;
   padding: 16px;
+}
+
+/* 宽表格布局：去除两侧空白，占满整个页面 */
+.app--wide {
+  max-width: none;
 }
 
 .app-header {
