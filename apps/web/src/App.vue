@@ -53,10 +53,12 @@ onMounted(() => load(params.value))
       </aside>
 
       <main class="main">
-        <p v-if="loading" class="hint">加载中…</p>
+        <p v-if="loading && items.length === 0" class="hint">加载中…</p>
         <p v-else-if="error" class="hint error">{{ error }}</p>
         <p v-else-if="items.length === 0" class="hint">暂无搜索结果</p>
-        <ClassList v-else :items="items" :layout="layout" />
+        <div v-else class="list-wrap" :class="{ 'is-loading': loading }">
+          <ClassList :items="items" :layout="layout" />
+        </div>
       </main>
     </div>
   </div>
@@ -130,6 +132,16 @@ onMounted(() => load(params.value))
 
 .main {
   min-width: 0;
+}
+
+/* 加载时保留旧内容，仅降低透明度提示加载中，避免闪屏 */
+.list-wrap {
+  transition: opacity 0.15s ease;
+}
+
+.list-wrap.is-loading {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .hint {
