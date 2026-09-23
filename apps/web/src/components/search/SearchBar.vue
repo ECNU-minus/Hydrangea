@@ -75,7 +75,7 @@ const totalPages = () => Math.max(1, Math.ceil(props.total / pageSize.value))
       class="keyword"
       type="text"
       placeholder="搜索课程名称、代码、教师、地点…"
-      @keyup.enter="apply"
+      @input="apply"
     />
 
     <div class="filters">
