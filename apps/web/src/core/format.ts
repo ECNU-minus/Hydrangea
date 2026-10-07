@@ -1,7 +1,7 @@
 /**
  * 格式化纯函数（零框架依赖）
  *
- * 供搜索结果各布局（CardLayout / TableLayout 等）共用，避免重复实现。
+ * 供搜索结果各布局（CardLayout / WideTableLayout 等）共用，避免重复实现。
  * 对应 DESIGN.md §4.5「搜索结果多布局」。
  */
 

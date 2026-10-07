@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { queryClasses, type ClassItem, type QueryClassesParams } from './api/classes'
 import SearchBar from './components/search/SearchBar.vue'
-import ClassList, { LAYOUT_META, type ClassListLayout } from './components/search/ClassList.vue'
+import ClassList, { LAYOUT_META } from './components/search/ClassList.vue'
+import { useIsDesktop } from './composables/useMediaQuery'
 
 /** 当前学期（暂固定，学期切换留待后续切片） */
 const SEMESTER = '2026-2027-1'
 
-/** 当前布局（暂固定，布局切换留待后续切片） */
-const layout = ref<ClassListLayout>('card')
+/** 布局随视口自适应：桌面端宽表格，移动端卡片（DESIGN.md §4.5） */
+const isDesktop = useIsDesktop()
+const layout = computed(() => (isDesktop.value ? 'wide-table' : 'card'))
 
 const params = ref<QueryClassesParams>({ semester: SEMESTER })
 const items = ref<ClassItem[]>([])

@@ -1,6 +1,6 @@
 <script lang="ts">
 /** 搜索结果布局类型（DESIGN.md §4.5） */
-export type ClassListLayout = 'card' | 'table' | 'wide-table'
+export type ClassListLayout = 'card' | 'wide-table'
 
 /** 布局对页面容器的需求：narrow = 窄容器（居中），normal = 标准容器（居中 1200px），wide = 占满整个页面 */
 export type LayoutContainer = 'narrow' | 'normal' | 'wide'
@@ -12,7 +12,6 @@ export type LayoutContainer = 'narrow' | 'normal' | 'wide'
  */
 export const LAYOUT_META: Record<ClassListLayout, { container: LayoutContainer }> = {
   card: { container: 'narrow' },
-  table: { container: 'normal' },
   'wide-table': { container: 'wide' },
 }
 </script>
@@ -20,7 +19,6 @@ export const LAYOUT_META: Record<ClassListLayout, { container: LayoutContainer }
 <script setup lang="ts">
 import type { ClassItem } from '../../api/classes'
 import CardLayout from './layouts/CardLayout.vue'
-import TableLayout from './layouts/TableLayout.vue'
 import WideTableLayout from './layouts/WideTableLayout.vue'
 
 defineProps<{
@@ -32,7 +30,6 @@ defineProps<{
 
 <template>
   <CardLayout v-if="layout === 'card'" :items="items" />
-  <TableLayout v-else-if="layout === 'table'" :items="items" />
   <WideTableLayout v-else-if="layout === 'wide-table'" :items="items" />
   <!-- 新增布局在此注册：<XxxLayout v-else-if="layout === 'xxx'" :items="items" /> -->
 </template>

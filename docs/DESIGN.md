@@ -8,10 +8,11 @@
 | v1.1 | 2026-09-23 | Niazye | 搜索结果支持多布局共存：新增 `core/format.ts` 纯函数（格式化周次/时间），`components/search/layouts/` 存放各布局组件，`ClassList.vue` 作为布局门面按 `layout` 分发；新增 §4.5 搜索结果多布局 |
 | v1.2 | 2026-09-23 | Niazye | 新增 `wide-table` 宽表格布局：在表格基础上去除两侧空白、占满整个页面（`.app--wide` 容器不设 `max-width`）；§4.5 补充布局类型表 |
 | v1.3 | 2026-09-23 | Niazye | 布局元数据机制：`ClassList.vue` 导出 `LAYOUT_META` 声明各布局的容器需求（`normal`/`wide`），`App.vue` 据此决定容器样式，不再硬编码具体布局名，消除与布局类型的耦合 |
+| v1.4 | 2026-10-07 | Niazye | 布局随视口自适应：新增 `composables/useMediaQuery.ts`（`useIsDesktop`，断点 768px），`App.vue` 据此在桌面端用 `wide-table`、移动端用 `card`；**移除 `table` 布局**（删除 `TableLayout.vue`，类型收窄为 `'card' \| 'wide-table'`）；§4.5 更新布局类型表与自适应说明 |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
-| 文档版本 | v1.3 |
+| 文档版本 | v1.4 |
 | 编写日期 | 2026-09-23 |
 | 文档状态 | 完整版，待评审 |
 | 目标读者 | 前后端开发、测试、运维 |
@@ -270,8 +271,8 @@ src/
 │   ├── search/              # 搜索页组件
 │   │   ├── ClassList.vue    # 搜索结果布局门面（按 layout 分发）
 │   │   └── layouts/         # 各布局组件，互不依赖
-│   │       ├── CardLayout.vue      # 卡片布局
-│   │       └── TableLayout.vue     # 表格布局
+│   │       ├── CardLayout.vue      # 卡片布局（移动端）
+│   │       └── WideTableLayout.vue # 宽表格布局（桌面端）
 │   ├── schedule/            # 排课页组件
 │   ├── export/              # 导出组件
 │   ├── import/              # 导入组件
@@ -289,13 +290,14 @@ src/
 - **每种布局一个独立组件**，存放于 `components/search/layouts/`，互不依赖、互不影响。
 - **`ClassList.vue` 作为布局门面**，接收 `layout` prop，按类型分发到对应布局组件。
 
-**布局类型**：字符串字面量联合类型 `'card' | 'table' | 'wide-table'`（当前已实现 `card`、`table`、`wide-table`）。
+**布局类型**：字符串字面量联合类型 `'card' | 'wide-table'`（当前已实现 `card`、`wide-table`）。
 
 | 布局 | 说明 |
 | --- | --- |
 | `card` | 卡片布局，适合窄屏/移动端 |
-| `table` | 表格布局，受页面最大宽度（1200px）约束 |
-| `wide-table` | 宽表格布局，在表格基础上**去除两侧空白、占满整个页面**（`.app--wide` 容器不设 `max-width`） |
+| `wide-table` | 宽表格布局，去除两侧空白、占满整个页面（`.app--wide` 容器不设 `max-width`），适合桌面端 |
+
+**自适应选择**：布局不再由用户手动切换，而是**随视口宽度自适应**。`composables/useMediaQuery.ts` 封装 `window.matchMedia`，导出 `useIsDesktop()`（断点 `DESKTOP_MIN_WIDTH = 768px`）；`App.vue` 据此计算 `layout`：桌面端（宽度 ≥ 768px）用 `wide-table`，移动端用 `card`。拖动窗口跨越断点时布局实时切换，无需刷新。
 
 **布局元数据（`LAYOUT_META`）**：`ClassList.vue` 导出 `LAYOUT_META` 映射，声明每种布局对页面容器的需求（`container: 'normal' | 'wide'`）。`App.vue` 据此决定容器样式（如 `wide` 时加 `.app--wide` 类占满页面），**无需关心具体布局名**，避免与具体布局类型耦合。
 
