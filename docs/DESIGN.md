@@ -203,7 +203,7 @@ flowchart LR
 | 参数 | 类型 | 说明 |
 | --- | --- | --- |
 | `semester` | string | 学期标识（必填，格式见 2.5；用于过滤 `teaching_classes.semester`） |
-| `keyword` | string | 关键词（模糊匹配所有文本字段） |
+| `keyword` | string | 关键词（模糊匹配所有文本字段，但不包括筛选条件） |
 | `courseType` | string | 课程类型筛选 |
 | `courseNature` | string | 课程性质筛选 |
 | `department` | string | 开课部门筛选 |
