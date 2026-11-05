@@ -18,19 +18,25 @@ const total = ref(0)
 const loading = ref(false)
 const error = ref('')
 
+/** 只接受最后一次请求的结果：关键词输入与筛选切换都会连续触发查询，响应可能乱序到达 */
+let latestRequestId = 0
+
 async function load(p: QueryClassesParams) {
+  const requestId = ++latestRequestId
   loading.value = true
   error.value = ''
   try {
     const result = await queryClasses(p)
+    if (requestId !== latestRequestId) return
     items.value = result.items
     total.value = result.total
   } catch (e) {
+    if (requestId !== latestRequestId) return
     error.value = e instanceof Error ? e.message : '加载失败'
     items.value = []
     total.value = 0
   } finally {
-    loading.value = false
+    if (requestId === latestRequestId) loading.value = false
   }
 }
 
