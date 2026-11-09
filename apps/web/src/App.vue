@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { queryClasses, type ClassItem, type QueryClassesParams } from './api/classes'
+import { EMPTY_FILTER_OPTIONS, queryFilters, type FilterOptions } from './api/filters'
 import SearchBar from './components/search/SearchBar.vue'
 import ClassList, { LAYOUT_META } from './components/search/ClassList.vue'
 import { useIsDesktop } from './composables/useMediaQuery'
@@ -17,6 +18,20 @@ const items = ref<ClassItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
+
+/** 筛选项（课程类型/性质/部门，按当前学期由后端生成；培养层次固定，见 SearchBar） */
+const filterOptions = ref<FilterOptions>({ ...EMPTY_FILTER_OPTIONS })
+const filterOptionsError = ref('')
+
+/** 加载筛选项：失败不清空已加载的选项，仅在副栏提示 */
+async function loadFilterOptions(semester: string) {
+  try {
+    filterOptions.value = await queryFilters(semester)
+    filterOptionsError.value = ''
+  } catch (e) {
+    filterOptionsError.value = e instanceof Error ? e.message : '筛选项加载失败'
+  }
+}
 
 /** 只接受最后一次请求的结果：关键词输入与筛选切换都会连续触发查询，响应可能乱序到达 */
 let latestRequestId = 0
@@ -45,7 +60,10 @@ function onUpdate(p: QueryClassesParams) {
   load(p)
 }
 
-onMounted(() => load(params.value))
+onMounted(() => {
+  loadFilterOptions(SEMESTER)
+  load(params.value)
+})
 </script>
 
 <template>
@@ -57,7 +75,13 @@ onMounted(() => load(params.value))
 
     <div class="layout">
       <aside class="sidebar">
-        <SearchBar :params="params" :total="total" @update="onUpdate" />
+        <SearchBar
+          :params="params"
+          :total="total"
+          :options="filterOptions"
+          :options-error="filterOptionsError"
+          @update="onUpdate"
+        />
       </aside>
 
       <main class="main">

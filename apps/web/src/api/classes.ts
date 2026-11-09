@@ -23,14 +23,14 @@ export interface QueryClassesParams {
   semester: string;
   /** 关键词（模糊匹配所有文本字段） */
   keyword?: string;
-  /** 课程类型筛选 */
-  courseType?: string;
-  /** 课程性质筛选 */
-  courseNature?: string;
-  /** 开课部门筛选 */
-  department?: string;
-  /** 培养层次筛选 */
-  level?: string;
+  /** 课程类型筛选（多选，同一项内为「或」） */
+  courseType?: string[];
+  /** 课程性质筛选（多选，同一项内为「或」） */
+  courseNature?: string[];
+  /** 开课部门筛选（多选，同一项内为「或」） */
+  department?: string[];
+  /** 培养层次筛选（多选，同一项内为「或」） */
+  level?: string[];
   /** 页码（默认 1） */
   page?: number;
   /** 每页条数（默认 20） */
@@ -67,7 +67,13 @@ export async function queryClasses(
 ): Promise<QueryClassesResult> {
   const url = new URL('/api/classes', window.location.origin);
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== '') {
+    if (value === undefined || value === '') continue;
+    // 多选筛选以「重复查询参数」传递（DESIGN.md §3.2）；空数组表示该项不限，直接省略
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        if (v !== '') url.searchParams.append(key, String(v));
+      }
+    } else {
       url.searchParams.set(key, String(value));
     }
   }
