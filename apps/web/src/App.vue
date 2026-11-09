@@ -2,18 +2,21 @@
 import { computed, onMounted, ref } from 'vue'
 import { queryClasses, type ClassItem, type QueryClassesParams } from './api/classes'
 import { EMPTY_FILTER_OPTIONS, queryFilters, type FilterOptions } from './api/filters'
+import SemesterSelect from './components/search/SemesterSelect.vue'
 import SearchBar from './components/search/SearchBar.vue'
 import ClassList, { LAYOUT_META } from './components/search/ClassList.vue'
 import { useIsDesktop } from './composables/useMediaQuery'
+import { useUiStore } from './stores/uiStore'
 
-/** 当前学期（暂固定，学期切换留待后续切片） */
-const SEMESTER = '2026-2027-1'
+/** 当前学期与可用学期（DESIGN.md §4.3 uiStore） */
+const uiStore = useUiStore()
 
 /** 布局随视口自适应：桌面端宽表格，移动端卡片（DESIGN.md §4.5） */
 const isDesktop = useIsDesktop()
 const layout = computed(() => (isDesktop.value ? 'wide-table' : 'card'))
 
-const params = ref<QueryClassesParams>({ semester: SEMESTER })
+/** 查询参数（学期由 uiStore 决定，学期列表加载完成后填充） */
+const params = ref<QueryClassesParams>({ semester: '' })
 const items = ref<ClassItem[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -60,8 +63,30 @@ function onUpdate(p: QueryClassesParams) {
   load(p)
 }
 
-onMounted(() => {
-  loadFilterOptions(SEMESTER)
+/**
+ * 切换学期（PRD §3.2.1/§3.6.5）
+ *
+ * 学期变化后课程数据与筛选项都要重新加载；搜索条件与分页回到初始状态
+ * （SearchBar 以 currentSemester 作 key，切换时重建组件状态）。
+ */
+function onSemesterChange(semester: string) {
+  if (!semester || semester === uiStore.currentSemester) return
+
+  uiStore.setSemester(semester)
+  params.value = { semester }
+  items.value = []
+  total.value = 0
+  loadFilterOptions(semester)
+  load(params.value)
+}
+
+onMounted(async () => {
+  await uiStore.loadSemesters()
+  const semester = uiStore.currentSemester
+  if (!semester) return
+
+  params.value = { semester }
+  loadFilterOptions(semester)
   load(params.value)
 })
 </script>
@@ -70,12 +95,20 @@ onMounted(() => {
   <div class="app" :class="`app--${LAYOUT_META[layout].container}`">
     <header class="app-header">
       <h1>Hydrangea · 课程查询</h1>
-      <span class="semester">{{ SEMESTER }}</span>
+      <span class="semester">{{ uiStore.currentSemester }}</span>
     </header>
 
     <div class="layout">
       <aside class="sidebar">
+        <SemesterSelect
+          :options="uiStore.availableSemesters"
+          :model-value="uiStore.currentSemester"
+          :loading="uiStore.loading"
+          :error="uiStore.error"
+          @update:model-value="onSemesterChange"
+        />
         <SearchBar
+          :key="uiStore.currentSemester"
           :params="params"
           :total="total"
           :options="filterOptions"
@@ -85,7 +118,8 @@ onMounted(() => {
       </aside>
 
       <main class="main">
-        <p v-if="loading && items.length === 0" class="hint">加载中…</p>
+        <p v-if="!uiStore.currentSemester" class="hint">学期信息不可用，请稍后重试</p>
+        <p v-else-if="loading && items.length === 0" class="hint">加载中…</p>
         <p v-else-if="error" class="hint error">{{ error }}</p>
         <p v-else-if="items.length === 0" class="hint">暂无搜索结果</p>
         <div v-else class="list-wrap" :class="{ 'is-loading': loading }">
