@@ -16,11 +16,13 @@
 项目已进入**功能切片迭代**阶段，奠基迭代（需求与设计）已完成。
 
 **已完成**
-- 需求与设计文档：`docs/PRD.md`（v1.3）、`docs/DESIGN.md`（v1.7）。
+- 需求与设计文档：`docs/PRD.md`（v1.3）、`docs/DESIGN.md`（v1.8）。
 - 后端：NestJS 只读查询 API，基于 `seed.ts` 种子数据（4 个学期、52 条，尚未接入 SQLite）。
   - `GET /api/classes`：关键词 + 四项筛选（每项可多选，同项或、跨项与）+ 分页，按学期过滤。
   - `GET /api/filters`：按学期返回课程类型 / 课程性质 / 开课部门三项选项（按出现次数降序）。
-- 前端：Vue 3 + Vite 搜索页，已打通 `/api/classes` 与 `/api/filters`。
+  - `GET /api/semesters`：可用学期（最新在前）+ 当前学期（含今天的学期）。
+- 前端：Vue 3 + Vite + Pinia 搜索页，已打通 `/api/classes`、`/api/filters`、`/api/semesters`。
+  - 副栏学期下拉（`uiStore`）：切换后重置分页、重查课程与筛选项，并记住上次选择。
   - 搜索栏（关键词输入即触发 + 四项复选筛选 + 分页），三项选项由后端动态提供、培养层次固定三个。
   - 搜索结果多布局：桌面端 `wide-table`、移动端 `card`，随视口自适应（断点 768px）。
 
@@ -29,8 +31,7 @@
 - 排课页与周课表、冲突检测。
 - 排课方案管理。
 - 导出（ICS / PNG / 排课码 / 教学班代码文本）与导入。
-- 学期切换 UI（当前学期在前端硬编码为 `2026-2027-1`）。
-- `GET /api/semesters`、`GET /api/classes/:classCode`（设计已定义，后端未实现）。
+- `GET /api/classes/:classCode`（设计已定义，后端未实现）。
 - SQLite 接入与爬虫数据替换（当前为种子数据）。
 
 ## 权威文档
@@ -49,7 +50,7 @@
 | --- | --- | --- |
 | 架构 | 前后端分离 | 前端 SPA + 后端只读查询 API |
 | 前端框架 | Vue 3 + TypeScript + Vite | 组合式 API |
-| 前端状态 | Pinia | 全局状态管理（尚未引入） |
+| 前端状态 | Pinia | 全局状态管理（已引入：`stores/uiStore.ts`） |
 | 前端 UI | Material You（MD3） | 视觉风格 |
 | 前端本地存储 | IndexedDB（idb 封装） | 用户数据（方案/标记）持久化（尚未引入） |
 | 后端框架 | NestJS + TypeScript | 只读查询 API |
@@ -70,6 +71,7 @@ Hydrangea/
 │   │       ├── api/         # 后端 API 客户端
 │   │       ├── components/  # 组件（search/ 搜索页、layouts/ 各布局）
 │   │       ├── composables/ # 组合式函数（useMediaQuery 等）
+│   │       ├── stores/      # Pinia store（uiStore 等）
 │   │       └── core/        # 纯函数，零框架依赖（format.ts 等）
 │   └── server/              # 后端（NestJS）
 │       └── src/             # 控制器 / 服务 / 种子数据
