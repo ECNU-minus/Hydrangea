@@ -6,17 +6,24 @@ import SemesterSelect from './components/search/SemesterSelect.vue'
 import SearchBar from './components/search/SearchBar.vue'
 import ClassList, { LAYOUT_META } from './components/search/ClassList.vue'
 import { useIsDesktop } from './composables/useMediaQuery'
+import { useSearchStore } from './stores/searchStore'
 import { useUiStore } from './stores/uiStore'
 
 /** 当前学期与可用学期（DESIGN.md §4.3 uiStore） */
 const uiStore = useUiStore()
 
+/**
+ * 搜索与筛选条件（DESIGN.md §4.3 searchStore）
+ *
+ * 条件本身**与学期解耦**：切换学期时只裁掉新学期不存在的选中值，其余保持
+ * （PRD §3.6.5）。学期只在组装查询参数时传入。
+ */
+const searchStore = useSearchStore()
+
 /** 布局随视口自适应：桌面端宽表格，移动端卡片（DESIGN.md §4.5） */
 const isDesktop = useIsDesktop()
 const layout = computed(() => (isDesktop.value ? 'wide-table' : 'card'))
 
-/** 查询参数（学期由 uiStore 决定，学期列表加载完成后填充） */
-const params = ref<QueryClassesParams>({ semester: '' })
 const items = ref<ClassItem[]>([])
 const total = ref(0)
 const loading = ref(false)
@@ -25,6 +32,9 @@ const error = ref('')
 /** 筛选项（课程类型/性质/部门，按当前学期由后端生成；培养层次固定，见 SearchBar） */
 const filterOptions = ref<FilterOptions>({ ...EMPTY_FILTER_OPTIONS })
 const filterOptionsError = ref('')
+
+/** 切换学期时被取消的筛选项提示（空串表示无） */
+const droppedNotice = ref('')
 
 /** 加载筛选项：失败不清空已加载的选项，仅在副栏提示 */
 async function loadFilterOptions(semester: string) {
@@ -58,36 +68,48 @@ async function load(p: QueryClassesParams) {
   }
 }
 
-function onUpdate(p: QueryClassesParams) {
-  params.value = p
-  load(p)
+/** 按当前条件 + 当前学期查询 */
+function refresh() {
+  const semester = uiStore.currentSemester
+  if (!semester) return
+  load(searchStore.toParams(semester))
+}
+
+/** 条件变化（关键词 / 复选 / 翻页）：条件状态已在 store 中更新 */
+function onApply() {
+  droppedNotice.value = ''
+  refresh()
 }
 
 /**
  * 切换学期（PRD §3.2.1/§3.6.5）
  *
- * 学期变化后课程数据与筛选项都要重新加载；搜索条件与分页回到初始状态
- * （SearchBar 以 currentSemester 作 key，切换时重建组件状态）。
+ * 先取新学期的筛选项并裁剪选中值，再按裁剪后的条件查询——避免「界面上看不到、
+ * 却仍在生效」的筛选。分页回到第 1 页；关键词与仍存在的筛选项保持不变。
  */
-function onSemesterChange(semester: string) {
+async function onSemesterChange(semester: string) {
   if (!semester || semester === uiStore.currentSemester) return
 
   uiStore.setSemester(semester)
-  params.value = { semester }
+  searchStore.resetPage()
   items.value = []
   total.value = 0
-  loadFilterOptions(semester)
-  load(params.value)
+
+  await loadFilterOptions(semester)
+  const dropped = searchStore.syncOptions(filterOptions.value)
+  droppedNotice.value = dropped.length
+    ? `该学期无此筛选项，已取消：${dropped.join('、')}`
+    : ''
+
+  refresh()
 }
 
 onMounted(async () => {
   await uiStore.loadSemesters()
-  const semester = uiStore.currentSemester
-  if (!semester) return
+  if (!uiStore.currentSemester) return
 
-  params.value = { semester }
-  loadFilterOptions(semester)
-  load(params.value)
+  await loadFilterOptions(uiStore.currentSemester)
+  refresh()
 })
 </script>
 
@@ -108,12 +130,11 @@ onMounted(async () => {
           @update:model-value="onSemesterChange"
         />
         <SearchBar
-          :key="uiStore.currentSemester"
-          :params="params"
           :total="total"
           :options="filterOptions"
           :options-error="filterOptionsError"
-          @update="onUpdate"
+          :notice="droppedNotice"
+          @apply="onApply"
         />
       </aside>
 

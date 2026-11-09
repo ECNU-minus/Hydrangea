@@ -1,33 +1,29 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { QueryClassesParams } from '../../api/classes'
+import { computed } from 'vue'
 import type { FilterOptions } from '../../api/filters'
+import { LEVEL_OPTIONS, type FilterKey } from '../../core/search'
+import { useSearchStore } from '../../stores/searchStore'
 
 const props = defineProps<{
-  /** 当前查询参数 */
-  params: QueryClassesParams
   /** 总条数（用于分页） */
   total: number
   /** 由 /api/filters 提供的三项选项（按当前学期生成） */
   options: FilterOptions
   /** 筛选项加载失败提示（空串表示正常） */
   optionsError?: string
+  /** 切换学期时因该学期无此值而被取消的筛选项提示 */
+  notice?: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'update', params: QueryClassesParams): void
+  (e: 'apply'): void
 }>()
 
-/** 培养层次选项固定为三个（PRD §6.1），不来自 /api/filters（DESIGN §3.3） */
-const LEVEL_OPTIONS = ['本科生', '研究生', '辅修、微专业']
+/** 搜索与筛选条件集中在 searchStore（与学期解耦） */
+const store = useSearchStore()
 
-/** 四项筛选维度（每项均为复选，key 与 QueryClassesParams 的筛选字段同名） */
-type FilterKey = 'courseType' | 'courseNature' | 'department' | 'level'
-
-/** 筛选项来自 /api/filters，随学期与数据自动变化（PRD §6.2） */
-const groups = computed<
-  { key: FilterKey; label: string; options: string[] }[]
->(() => [
+/** 四项筛选维度：前三项来自 /api/filters，培养层次固定（PRD §6.1） */
+const groups = computed<{ key: FilterKey; label: string; options: string[] }[]>(() => [
   { key: 'courseType', label: '课程类型', options: props.options.courseTypes },
   { key: 'courseNature', label: '课程性质', options: props.options.courseNatures },
   { key: 'department', label: '开课部门', options: props.options.departments },
@@ -42,66 +38,41 @@ const dynamicOptionsReady = computed(
     props.options.departments.length > 0,
 )
 
-/** 关键词 */
-const keyword = ref(props.params.keyword ?? '')
-
-/** 四项筛选的复选状态（空数组 = 该项不限） */
-const selected = ref<Record<FilterKey, string[]>>({
-  courseType: [...(props.params.courseType ?? [])],
-  courseNature: [...(props.params.courseNature ?? [])],
-  department: [...(props.params.department ?? [])],
-  level: [...(props.params.level ?? [])],
-})
-
-const page = ref(props.params.page ?? 1)
-const pageSize = ref(props.params.pageSize ?? 20)
-
-/**
- * 拼装查询参数
- *
- * 筛选项为空数组时传 `undefined`，由 API 客户端省略该参数（DESIGN.md §3.2）。
- */
-function buildParams(targetPage: number): QueryClassesParams {
-  const pick = (key: FilterKey) => {
-    const values = selected.value[key]
-    return values.length ? [...values] : undefined
-  }
-
-  return {
-    semester: props.params.semester,
-    keyword: keyword.value.trim() || undefined,
-    courseType: pick('courseType'),
-    courseNature: pick('courseNature'),
-    department: pick('department'),
-    level: pick('level'),
-    page: targetPage,
-    pageSize: pageSize.value,
-  }
+function onKeywordInput(event: Event) {
+  store.updateKeyword((event.target as HTMLInputElement).value)
+  emit('apply')
 }
 
-/** 任一条件变化时，重置到第 1 页并触发查询 */
-function apply() {
-  page.value = 1
-  emit('update', buildParams(1))
+function isChecked(key: FilterKey, value: string): boolean {
+  return store.selections[key].includes(value)
 }
 
-/** 分页跳转（保留当前筛选条件） */
-function goTo(p: number) {
-  page.value = p
-  emit('update', buildParams(p))
+function onToggle(key: FilterKey, value: string, event: Event) {
+  const checked = (event.target as HTMLInputElement).checked
+  const current = store.selections[key]
+  store.setSelection(
+    key,
+    checked ? [...current, value] : current.filter((item) => item !== value),
+  )
+  emit('apply')
 }
 
-const totalPages = () => Math.max(1, Math.ceil(props.total / pageSize.value))
+function goTo(target: number) {
+  store.setPage(target)
+  emit('apply')
+}
+
+const totalPages = () => Math.max(1, Math.ceil(props.total / store.pageSize))
 </script>
 
 <template>
   <div class="search-bar">
     <input
-      v-model="keyword"
       class="keyword"
       type="text"
       placeholder="搜索课程名称、代码、教师、地点…"
-      @input="apply"
+      :value="store.keyword"
+      @input="onKeywordInput"
     />
 
     <div class="filters">
@@ -111,10 +82,10 @@ const totalPages = () => Math.max(1, Math.ceil(props.total / pageSize.value))
           <div class="options">
             <label v-for="option in group.options" :key="option" class="option">
               <input
-                v-model="selected[group.key]"
                 type="checkbox"
                 :value="option"
-                @change="apply"
+                :checked="isChecked(group.key, option)"
+                @change="onToggle(group.key, option, $event)"
               />
               <span class="option__text">{{ option }}</span>
             </label>
@@ -124,13 +95,16 @@ const totalPages = () => Math.max(1, Math.ceil(props.total / pageSize.value))
 
       <p v-if="optionsError" class="filter-error">{{ optionsError }}</p>
       <p v-else-if="!dynamicOptionsReady" class="filter-hint">筛选项加载中…</p>
-      <p v-else class="filter-hint">不勾选任何选项表示该项不限；同一项内可多选。</p>
+      <p v-if="notice" class="filter-note">{{ notice }}</p>
+      <p v-if="dynamicOptionsReady" class="filter-hint">
+        不勾选任何选项表示该项不限；同一项内可多选。
+      </p>
     </div>
 
     <div class="pagination">
-      <button :disabled="page <= 1" @click="goTo(page - 1)">上一页</button>
-      <span>第 {{ page }} / {{ totalPages() }} 页 · 共 {{ total }} 条</span>
-      <button :disabled="page >= totalPages()" @click="goTo(page + 1)">下一页</button>
+      <button :disabled="store.page <= 1" @click="goTo(store.page - 1)">上一页</button>
+      <span>第 {{ store.page }} / {{ totalPages() }} 页 · 共 {{ total }} 条</span>
+      <button :disabled="store.page >= totalPages()" @click="goTo(store.page + 1)">下一页</button>
     </div>
   </div>
 </template>
@@ -202,6 +176,11 @@ const totalPages = () => Math.max(1, Math.ceil(props.total / pageSize.value))
   font-size: 0.8em;
   color: var(--text);
   opacity: 0.8;
+}
+
+.filter-note {
+  font-size: 0.8em;
+  color: #a06200;
 }
 
 .filter-error {
