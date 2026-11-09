@@ -33,8 +33,8 @@ const error = ref('')
 const filterOptions = ref<FilterOptions>({ ...EMPTY_FILTER_OPTIONS })
 const filterOptionsError = ref('')
 
-/** 切换学期时被取消的筛选项提示（空串表示无） */
-const droppedNotice = ref('')
+/** 切换学期时被暂存的筛选项提示（空串表示无） */
+const shelvedNotice = ref('')
 
 /** 加载筛选项：失败不清空已加载的选项，仅在副栏提示 */
 async function loadFilterOptions(semester: string) {
@@ -68,48 +68,50 @@ async function load(p: QueryClassesParams) {
   }
 }
 
-/** 按当前条件 + 当前学期查询 */
+/** 按当前条件 + 条件所属学期查询 */
 function refresh() {
-  const semester = uiStore.currentSemester
-  if (!semester) return
-  load(searchStore.toParams(semester))
+  if (!searchStore.boundSemester) return
+  load(searchStore.toParams())
 }
 
 /** 条件变化（关键词 / 复选 / 翻页）：条件状态已在 store 中更新 */
 function onApply() {
-  droppedNotice.value = ''
+  shelvedNotice.value = ''
   refresh()
 }
 
 /**
- * 切换学期（PRD §3.2.1/§3.6.5）
+ * 进入某个学期（PRD §3.2.1/§3.6.5）
  *
- * 先取新学期的筛选项并裁剪选中值，再按裁剪后的条件查询——避免「界面上看不到、
- * 却仍在生效」的筛选。分页回到第 1 页；关键词与仍存在的筛选项保持不变。
+ * 先取该学期筛选项，再让 searchStore 合并/恢复条件，最后查询：
+ * 1. 原学期中该学期同样存在的条件**顺延选中**；
+ * 2. 该学期此前记住的条件**恢复**；
+ * 3. 该学期暂时不存在的条件**暂存**（提示用户，切回时自动恢复）。
  */
+async function activateSemester(semester: string) {
+  await loadFilterOptions(semester)
+  const { shelved } = searchStore.enterSemester(semester, filterOptions.value)
+  shelvedNotice.value = shelved.length
+    ? `该学期无此筛选项，已暂存：${shelved.join('、')}（切回对应学期自动恢复）`
+    : ''
+  refresh()
+}
+
 async function onSemesterChange(semester: string) {
   if (!semester || semester === uiStore.currentSemester) return
 
   uiStore.setSemester(semester)
-  searchStore.resetPage()
   items.value = []
   total.value = 0
-
-  await loadFilterOptions(semester)
-  const dropped = searchStore.syncOptions(filterOptions.value)
-  droppedNotice.value = dropped.length
-    ? `该学期无此筛选项，已取消：${dropped.join('、')}`
-    : ''
-
-  refresh()
+  await activateSemester(semester)
 }
 
 onMounted(async () => {
   await uiStore.loadSemesters()
-  if (!uiStore.currentSemester) return
+  const semester = uiStore.currentSemester
+  if (!semester) return
 
-  await loadFilterOptions(uiStore.currentSemester)
-  refresh()
+  await activateSemester(semester)
 })
 </script>
 
@@ -133,7 +135,7 @@ onMounted(async () => {
           :total="total"
           :options="filterOptions"
           :options-error="filterOptionsError"
-          :notice="droppedNotice"
+          :notice="shelvedNotice"
           @apply="onApply"
         />
       </aside>

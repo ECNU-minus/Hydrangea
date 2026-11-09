@@ -1,8 +1,9 @@
 /**
  * 搜索与筛选条件（纯函数，零框架依赖）
  *
- * 关键约定：**搜索/筛选条件与学期解耦**——条件本身不随学期变化，
- * 切换学期时只把「新学期不存在」的选中值裁掉，其余保持选中（PRD §3.6.5）。
+ * 关键约定：**搜索/筛选条件与学期解耦**——条件不随学期清空。
+ * 每个学期各记一份条件：切换学期时把「新学期同样存在」的值顺延选中，
+ * 新学期暂时不存在的值**暂存**在该学期的记忆里，切回时自动恢复（PRD §3.6.5）。
  */
 
 import type { QueryClassesParams } from '../api/classes'
@@ -39,28 +40,66 @@ export function availableOptionsOf(options: FilterOptions): AvailableOptions {
 }
 
 /**
- * 按新学期的可选集合裁剪选中值
+ * 裁剪出「该学期当前可用」的选中值
  *
- * - 仍存在的选中值**保留**（切换学期后相同条件依旧选中）；
- * - 新学期不存在的选中值被移除，并收集到 `dropped` 供界面提示；
- * - 不修改入参。
+ * 只影响**显示与查询**，不丢数据：不可用的选中值由 `shelvedValues` 单独取出暂存，
+ * 以便切回有该选项的学期时恢复。不修改入参。
  */
-export function pruneSelections(
+export function clipSelections(
   selections: FilterSelections,
   available: AvailableOptions,
-): { selections: FilterSelections; dropped: string[] } {
+): FilterSelections {
   const next = emptySelections()
-  const dropped: string[] = []
 
   for (const key of FILTER_KEYS) {
     for (const value of selections[key]) {
       if (available[key].includes(value)) next[key].push(value)
-      else dropped.push(value)
     }
   }
 
-  return { selections: next, dropped }
+  return next
 }
+
+/** 取出「该学期不可用」的选中值（需要暂存，等切回有该选项的学期再恢复） */
+export function shelvedValues(
+  selections: FilterSelections,
+  available: AvailableOptions,
+): string[] {
+  const shelved: string[] = []
+
+  for (const key of FILTER_KEYS) {
+    for (const value of selections[key]) {
+      if (!available[key].includes(value)) shelved.push(value)
+    }
+  }
+
+  return shelved
+}
+
+/**
+ * 合并两批选中值：`base` 全量保留，`add` 只并入该学期可用的值
+ *
+ * 用于切换学期：`base` 是新学期**此前记住**的条件（可能仍含暂存值，需保留以备将来恢复），
+ * `add` 是原学期中**新学期同样存在**的条件（顺延选中）。
+ */
+export function mergeSelections(
+  base: FilterSelections,
+  add: FilterSelections,
+  available: AvailableOptions,
+): FilterSelections {
+  const next = emptySelections()
+
+  for (const key of FILTER_KEYS) {
+    const merged = new Set(base[key])
+    for (const value of add[key]) {
+      if (available[key].includes(value)) merged.add(value)
+    }
+    next[key] = [...merged]
+  }
+
+  return next
+}
+
 
 /** 查询条件（不含学期；学期在调用时单独传入） */
 export interface QueryConditions {
