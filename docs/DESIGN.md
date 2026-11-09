@@ -10,10 +10,12 @@
 | v1.3 | 2026-09-23 | Niazye | 布局元数据机制：`ClassList.vue` 导出 `LAYOUT_META` 声明各布局的容器需求（`normal`/`wide`），`App.vue` 据此决定容器样式，不再硬编码具体布局名，消除与布局类型的耦合 |
 | v1.4 | 2026-10-07 | Niazye | 布局随视口自适应：新增 `composables/useMediaQuery.ts`（`useIsDesktop`，断点 768px），`App.vue` 据此在桌面端用 `wide-table`、移动端用 `card`；**移除 `table` 布局**（删除 `TableLayout.vue`，类型收窄为 `'card' \| 'wide-table'`）；§4.5 更新布局类型表与自适应说明 |
 | v1.5 | 2026-10-08 | Niazye | 补全「学期区分」设计：§2.1 `teaching_classes` 新增 `semester` 字段，唯一键改为 `(semester, class_code)` 复合唯一，数据更新改为**按学期全量替换**；新增 §2.5 学期标识定义；§2.6 补充 `settings.currentSemester` 语义；§3.1/§3.2/§3.3 API 明确学期过滤与按学期生成筛选选项；§4.3 `uiStore` 补充学期职责；§5.2 明确排课码学期 3B BCD 编码规则 |
+| v1.6 | 2026-10-16 | Niazye | 四项筛选改为**多选**（与 PRD v1.3 同步）：§3.2 `courseType`/`courseNature`/`department`/`level` 类型改为 `string[]`，以重复查询参数传递，服务端归一化后「同项或、跨项与」，空数组即不限；§4.2 组件树补充 `SearchBar.vue` |
+| v1.7 | 2026-11-09 | Niazye | 落实 §3.3 `/api/filters`：新增 `FiltersService`/`FiltersController`（`GET /api/filters?semester=…`，按学期去重统计三项分类选项并注册进 `AppModule`）；补充实现约定（出现次数降序、同频次名称升序、学期不可用返回空选项）；前端新增 `api/filters.ts`，`SearchBar.vue` 改由 `options` prop 接收三项选项，不再硬编码 |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
-| 文档版本 | v1.5 |
+| 文档版本 | v1.7 |
 | 编写日期 | 2026-09-23 |
 | 文档状态 | 完整版，待评审 |
 | 目标读者 | 前后端开发、测试、运维 |
@@ -204,12 +206,19 @@ flowchart LR
 | --- | --- | --- |
 | `semester` | string | 学期标识（必填，格式见 2.5；用于过滤 `teaching_classes.semester`） |
 | `keyword` | string | 关键词（模糊匹配所有文本字段，但不包括筛选条件） |
-| `courseType` | string | 课程类型筛选 |
-| `courseNature` | string | 课程性质筛选 |
-| `department` | string | 开课部门筛选 |
-| `level` | string | 培养层次筛选 |
+| `courseType` | string[] | 课程类型筛选（多选，可重复传参） |
+| `courseNature` | string[] | 课程性质筛选（多选，可重复传参） |
+| `department` | string[] | 开课部门筛选（多选，可重复传参） |
+| `level` | string[] | 培养层次筛选（多选，可重复传参） |
 | `page` | number | 页码（默认 1） |
 | `pageSize` | number | 每页条数（默认 20） |
+
+> **多值筛选（PRD §3.1.2）**：四项筛选均支持多选，以**重复查询参数**传递，例如
+> `?semester=2026-2027-1&department=传播学院&department=地理科学学院&courseNature=选修`。
+> 语义为「**同项或、跨项与**」：同一项内多值取并集，不同项之间取交集。
+> 服务端将单值、重复参数（String 或 String[]）统一归一化为数组，并剔除空串与重复值；
+> **归一化后为空数组即该项不限**（等价于未传该参数），因此 `?courseType=` 与不传 `courseType` 均为不限。
+> 单值传法（如 `?level=本科生`）继续有效，与 `?level=本科生&level=本科生` 等价。
 
 **响应**：
 
@@ -258,6 +267,17 @@ flowchart LR
 > 三项选项**根据数据自动适应**（PRD §6.2）；培养层次选项**固定为三个**（本科生/研究生/辅修、微专业），由前端维护，不在此接口返回。
 > **按学期生成**：三项选项仅统计 `semester` 匹配的数据（`SELECT DISTINCT ... WHERE semester = ?`）。
 
+**实现约定（当前后端为种子数据）**：
+
+| 项 | 约定 |
+| --- | --- |
+| 排序 | **出现次数降序**；次数相同时**按名称升序**（`localeCompare(…, 'zh')`，即拼音序）。常用部门排在前面，便于勾选 |
+| 去重 | 同一取值只出现一次；空白值不参与统计 |
+| 学期缺失 / 不可用 | 返回三项均为空数组的响应（不报错），前端据此展示「筛选项加载中…」或错误提示 |
+| 空学期差异 | 选项与 `/api/classes` 的学期过滤使用同一判据，保证「选项里有的值一定能查出结果」 |
+
+> 前端 `apps/web/src/api/filters.ts` 为该接口的客户端；`SearchBar.vue` 通过 `options` prop 接收三项选项，培养层次仍由前端常量提供。
+
 ---
 
 ## 4. 前端设计
@@ -296,6 +316,7 @@ src/
 ├── components/
 │   ├── layout/              # 布局（副栏、汉堡按钮、学期切换）
 │   ├── search/              # 搜索页组件
+│   │   ├── SearchBar.vue    # 搜索栏（关键词 + 四项复选筛选 + 分页）
 │   │   ├── ClassList.vue    # 搜索结果布局门面（按 layout 分发）
 │   │   └── layouts/         # 各布局组件，互不依赖
 │   │       ├── CardLayout.vue      # 卡片布局（移动端）
