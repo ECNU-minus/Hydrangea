@@ -94,6 +94,22 @@ pnpm test             # 运行全部测试
 
 后端另有 `pnpm --filter server test:e2e`（e2e 测试）、`pnpm --filter server lint`（oxlint）；前端 `pnpm --filter web test`（Vitest，覆盖 `core/` 纯函数）。
 
+### 访问方式
+
+| 场景 | 地址 | 说明 |
+| --- | --- | --- |
+| 本机 | `http://localhost:5173` | 默认 |
+| 局域网 | `http://<本机IP>:5173` | `vite.config.ts` 已设 `host: true`（监听 0.0.0.0）；Windows 需放行 5173 入站：`New-NetFirewallRule -DisplayName "Hydrangea 5173" -Direction Inbound -Protocol TCP -LocalPort 5173 -Action Allow`（管理员） |
+| 公网（临时） | `https://<随机>.trycloudflare.com` | 见下方隧道命令；域名每次重启都变，`allowedHosts: true` 已允许任意域名 |
+
+```powershell
+# 临时把本机开发服务器暴露到公网（无需公网 IP / 路由器映射）
+& 'C:\Program Files (x86)\cloudflared\cloudflared.exe' tunnel --url http://localhost:5173
+```
+
+> 安全提醒：开发服务器无鉴权，公网暴露期间任何人都能打开页面并通过 `/api` 代理读取后端数据；仅供临时演示，用完即关。正式对外请用 `pnpm build` 产物 + Nginx/Caddy 反代。
+
+
 ## 协作模式：垂直切片迭代
 
 项目按**垂直切片**迭代推进。每个迭代是一个可独立交付的成果，从目标澄清到验证完整走一遍。
