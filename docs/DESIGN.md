@@ -14,10 +14,11 @@
 | v1.7 | 2026-11-09 | Niazye | 落实 §3.3 `/api/filters`：新增 `FiltersService`/`FiltersController`（`GET /api/filters?semester=…`，按学期去重统计三项分类选项并注册进 `AppModule`）；补充实现约定（出现次数降序、同频次名称升序、学期不可用返回空选项）；前端新增 `api/filters.ts`，`SearchBar.vue` 改由 `options` prop 接收三项选项，不再硬编码 |
 | v1.8 | 2026-11-10 | Niazye | 落实 §3.1 `/api/semesters`：响应改为 `{ semesters, current }`，学期按先后**倒序**，`current` 为**包含今天**的学期（无匹配回退最新）；新增 §3.4 接口契约与学期时间区间规则；前端引入 **Pinia**（`uiStore`）与副栏学期下拉，切换学期后重置分页并重新拉取课程与筛选项 |
 | v1.9 | 2026-11-10 | Niazye | §4.3 拆分状态职责：新增 `searchStore` 持有搜索与筛选条件（**与学期解耦**），`courseStore` 只保留查询结果与筛选项缓存；条件相关纯函数移入 `core/search.ts`（`pruneSelections` / `buildQueryParams` 等）并新增 Vitest 前端单测与 `vitest.config.ts`；切换学期改为「先取筛选项→裁剪条件→再查询」 |
+| v1.10 | 2026-11-10 | Niazye | §4.3 条件改为**按学期记忆**：新增 `memory: Record<学期, FilterSelections>`，生效条件为 `clipSelections(memory[学期], 可用选项)`；纯函数调整为 `clipSelections` / `shelvedValues` / `mergeSelections`（原 `pruneSelections` 拆分），本学期不可用的选中值暂存于原学期记忆并在切回时恢复；条件写入 `localStorage`（`hydrangea.searchConditions.v1`）以便刷新后恢复 |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
-| 文档版本 | v1.9 |
+| 文档版本 | v1.10 |
 | 编写日期 | 2026-09-23 |
 | 文档状态 | 完整版，待评审 |
 | 目标读者 | 前后端开发、测试、运维 |
@@ -394,18 +395,26 @@ src/
 
 **搜索/筛选条件与学期解耦**（PRD §3.6.5）：
 
-- `searchStore` **不持有学期**；学期在组装查询参数时由调用方传入（`core/search.ts` 的 `buildQueryParams(semester, conditions)`）。
-- 切换学期时，用新学期的可选集合裁剪选中值（`pruneSelections`）：仍存在的选中值**保持选中**，不存在的**移除**并由界面提示。
-- 培养层次固定为三项，不参与裁剪。
-- 分页在切换学期时回到第 1 页；关键词与其余条件保持。
+- `searchStore` 用 `memory: Record<学期, FilterSelections>` **按学期分别记住**条件，`boundSemester` 仅表示当前条件所属学期；条件内容（关键词、四项选中值）本身与学期无关。
+- 当前学期**实际生效**的条件是派生值：`selections = clipSelections(memory[boundSemester], available)`，即「记住的条件 ∩ 该学期可用选项」。因此界面上永远不会出现不可见却仍在生效的筛选。
+- 切换学期时：
+  1. 取原学期**实际生效**的条件（`clipSelections`），其中新学期同样存在的值**顺延选中**（`mergeSelections`）；
+  2. 新学期此前记住的条件**恢复**；
+  3. 新学期不存在的值**暂存**在原学期的记忆里（不出现在 `selections`，故不参与查询），并通过 `shelvedValues` 提示「切回对应学期自动恢复」。
+- 在原学期取消选中会把该值从记忆里移除，切回时不会再复活。
+- 关键词跨学期共用；分页在切换学期时回到第 1 页。
 
-> 纯函数集中在 `core/search.ts`（`FILTER_KEYS` / `LEVEL_OPTIONS` / `emptySelections` / `availableOptionsOf` / `pruneSelections` / `buildQueryParams`），由 `src/core/search.spec.ts` 覆盖（Vitest）。
+**持久化**：条件以 `localStorage` 键 `hydrangea.searchConditions.v1` 保存（`{ keyword, memory }`），刷新页面后自动恢复；S2 引入 IndexedDB 后迁入 `settings`。
+
+> 纯函数集中在 `core/search.ts`（`FILTER_KEYS` / `LEVEL_OPTIONS` / `emptySelections` / `availableOptionsOf` / `clipSelections` / `shelvedValues` / `mergeSelections` / `buildQueryParams`），由 `src/core/search.spec.ts` 覆盖（Vitest，含 A→B→A 恢复场景）。
 
 ### 4.4 本地存储（IndexedDB）
 
 - 使用 `idb` 库封装 IndexedDB。
-- 存储 `plans`（方案列表）与 `settings`（当前学期/当前方案）。
+- 存储 `plans`（方案列表）与 `settings`（当前学期/当前方案/搜索与筛选条件）。
 - 提供「清空所有数据」入口（PRD §4 数据持久性）。
+
+> 过渡期：当前学期与搜索条件暂存于 `localStorage`（`hydrangea.currentSemester`、`hydrangea.searchConditions.v1`），S2 引入 `idb` 后一并迁入 `settings` 并清理这两个键。
 
 ---
 
