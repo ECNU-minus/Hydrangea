@@ -13,10 +13,11 @@
 | v1.6 | 2026-10-16 | Niazye | 四项筛选改为**多选**（与 PRD v1.3 同步）：§3.2 `courseType`/`courseNature`/`department`/`level` 类型改为 `string[]`，以重复查询参数传递，服务端归一化后「同项或、跨项与」，空数组即不限；§4.2 组件树补充 `SearchBar.vue` |
 | v1.7 | 2026-11-09 | Niazye | 落实 §3.3 `/api/filters`：新增 `FiltersService`/`FiltersController`（`GET /api/filters?semester=…`，按学期去重统计三项分类选项并注册进 `AppModule`）；补充实现约定（出现次数降序、同频次名称升序、学期不可用返回空选项）；前端新增 `api/filters.ts`，`SearchBar.vue` 改由 `options` prop 接收三项选项，不再硬编码 |
 | v1.8 | 2026-11-10 | Niazye | 落实 §3.1 `/api/semesters`：响应改为 `{ semesters, current }`，学期按先后**倒序**，`current` 为**包含今天**的学期（无匹配回退最新）；新增 §3.4 接口契约与学期时间区间规则；前端引入 **Pinia**（`uiStore`）与副栏学期下拉，切换学期后重置分页并重新拉取课程与筛选项 |
+| v1.9 | 2026-11-10 | Niazye | §4.3 拆分状态职责：新增 `searchStore` 持有搜索与筛选条件（**与学期解耦**），`courseStore` 只保留查询结果与筛选项缓存；条件相关纯函数移入 `core/search.ts`（`pruneSelections` / `buildQueryParams` 等）并新增 Vitest 前端单测与 `vitest.config.ts`；切换学期改为「先取筛选项→裁剪条件→再查询」 |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
-| 文档版本 | v1.8 |
+| 文档版本 | v1.9 |
 | 编写日期 | 2026-09-23 |
 | 文档状态 | 完整版，待评审 |
 | 目标读者 | 前后端开发、测试、运维 |
@@ -384,11 +385,21 @@ src/
 
 ### 4.3 状态管理（Pinia）
 
-| Store | 职责 |
-| --- | --- |
-| `courseStore` | 课程查询结果、筛选选项（按当前学期） |
-| `planStore` | 当前方案、方案列表（按当前学期过滤）、标记操作 |
-| `uiStore` | 当前学期（`currentSemester`）、可用学期列表、副栏展开状态 |
+| Store | 职责 | 现状 |
+| --- | --- | --- |
+| `uiStore` | 当前学期（`currentSemester`）、可用学期列表、副栏展开状态 | 已实现 |
+| `searchStore` | 搜索与筛选条件（关键词、四项选中值、分页），**与学期解耦** | 已实现 |
+| `courseStore` | 课程查询结果、当前学期的筛选项缓存 | 未实现（暂由 `App.vue` 持有） |
+| `planStore` | 当前方案、方案列表（按当前学期过滤）、标记操作 | 未实现 |
+
+**搜索/筛选条件与学期解耦**（PRD §3.6.5）：
+
+- `searchStore` **不持有学期**；学期在组装查询参数时由调用方传入（`core/search.ts` 的 `buildQueryParams(semester, conditions)`）。
+- 切换学期时，用新学期的可选集合裁剪选中值（`pruneSelections`）：仍存在的选中值**保持选中**，不存在的**移除**并由界面提示。
+- 培养层次固定为三项，不参与裁剪。
+- 分页在切换学期时回到第 1 页；关键词与其余条件保持。
+
+> 纯函数集中在 `core/search.ts`（`FILTER_KEYS` / `LEVEL_OPTIONS` / `emptySelections` / `availableOptionsOf` / `pruneSelections` / `buildQueryParams`），由 `src/core/search.spec.ts` 覆盖（Vitest）。
 
 ### 4.4 本地存储（IndexedDB）
 
