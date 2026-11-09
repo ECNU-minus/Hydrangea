@@ -33,8 +33,12 @@ const error = ref('')
 const filterOptions = ref<FilterOptions>({ ...EMPTY_FILTER_OPTIONS })
 const filterOptionsError = ref('')
 
-/** 切换学期时被暂存的筛选项提示（空串表示无） */
-const shelvedNotice = ref('')
+/** 全局条件里当前学期用不到的部分：提示它们暂不生效、切回对应学期会恢复 */
+const shelvedNotice = computed(() =>
+  searchStore.shelved.length
+    ? `该学期无此筛选项，暂不生效：${searchStore.shelved.join('、')}（切回对应学期自动恢复）`
+    : '',
+)
 
 /** 加载筛选项：失败不清空已加载的选项，仅在副栏提示 */
 async function loadFilterOptions(semester: string) {
@@ -76,24 +80,18 @@ function refresh() {
 
 /** 条件变化（关键词 / 复选 / 翻页）：条件状态已在 store 中更新 */
 function onApply() {
-  shelvedNotice.value = ''
   refresh()
 }
 
 /**
  * 进入某个学期（PRD §3.2.1/§3.6.5）
  *
- * 先取该学期筛选项，再让 searchStore 合并/恢复条件，最后查询：
- * 1. 原学期中该学期同样存在的条件**顺延选中**；
- * 2. 该学期此前记住的条件**恢复**；
- * 3. 该学期暂时不存在的条件**暂存**（提示用户，切回时自动恢复）。
+ * 全局条件只有一份、不随学期变化；这里只更换「该学期的可用选项」，再由 store 派生
+ * 出该学期生效的条件（该学期不存在条件自动暂不生效，切回时恢复），最后查询。
  */
 async function activateSemester(semester: string) {
   await loadFilterOptions(semester)
-  const { shelved } = searchStore.enterSemester(semester, filterOptions.value)
-  shelvedNotice.value = shelved.length
-    ? `该学期无此筛选项，已暂存：${shelved.join('、')}（切回对应学期自动恢复）`
-    : ''
+  searchStore.enterSemester(semester, filterOptions.value)
   refresh()
 }
 

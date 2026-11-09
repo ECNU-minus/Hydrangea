@@ -1,9 +1,9 @@
 /**
  * 搜索与筛选条件（纯函数，零框架依赖）
  *
- * 关键约定：**搜索/筛选条件与学期解耦**——条件不随学期清空。
- * 每个学期各记一份条件：切换学期时把「新学期同样存在」的值顺延选中，
- * 新学期暂时不存在的值**暂存**在该学期的记忆里，切回时自动恢复（PRD §3.6.5）。
+ * 关键约定：**全局只保存一份条件**，与学期解耦。
+ * 切换学期时，按该学期是否存在某个条件决定它是否进入查询参数：
+ * 不存在的条件**保留在全局条件里**（暂不生效），切回包含它的学期会自动生效（PRD §3.6.5）。
  */
 
 import type { QueryClassesParams } from '../api/classes'
@@ -77,24 +77,23 @@ export function shelvedValues(
 }
 
 /**
- * 合并两批选中值：`base` 全量保留，`add` 只并入该学期可用的值
+ * 用「界面上的选中值」更新全局条件
  *
- * 用于切换学期：`base` 是新学期**此前记住**的条件（可能仍含暂存值，需保留以备将来恢复），
- * `add` 是原学期中**新学期同样存在**的条件（顺延选中）。
+ * 全局只保存一份条件：勾选/取消勾选直接改动这一份。
+ * 当前学期**不可用**的值原样保留（它们只在包含该选项的学期生效），
+ * 当前学期可用的值以 `visible` 为准（含取消）。
  */
-export function mergeSelections(
-  base: FilterSelections,
-  add: FilterSelections,
+export function applyVisibleSelections(
+  saved: FilterSelections,
+  visible: FilterSelections,
   available: AvailableOptions,
 ): FilterSelections {
   const next = emptySelections()
 
   for (const key of FILTER_KEYS) {
-    const merged = new Set(base[key])
-    for (const value of add[key]) {
-      if (available[key].includes(value)) merged.add(value)
-    }
-    next[key] = [...merged]
+    // 该项在当前学期用不到的选中值：保留，等切到包含该选项的学期再生效
+    const kept = saved[key].filter((value) => !available[key].includes(value))
+    next[key] = [...new Set([...kept, ...visible[key]])]
   }
 
   return next
