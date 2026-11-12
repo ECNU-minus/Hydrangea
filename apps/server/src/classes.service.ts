@@ -138,8 +138,20 @@ export class ClassesService {
         };
     }
 
-    /** 关键词匹配：命中任一文本字段即算匹配 */
-    private matchKeyword(c: SeedClass, kw: string): boolean {
+    /**
+     * 获取单个教学班（DESIGN §3.5）
+     *
+     * 教学班代码**跨学期重复**，故必须带学期一起定位；学期或代码不匹配时返回 undefined。
+     */
+    findOne(semester: string, classCode: string): ClassItem | undefined {
+        if (!semester || !classCode) return undefined;
+
+        const found = seedClasses.find((c) => c.semester === semester && c.classCode === classCode);
+
+        return found ? this.toItem(found) : undefined;
+    }
+
+    /** 关键词匹配：命中任一文本字段即算匹配 */    private matchKeyword(c: SeedClass, kw: string): boolean {
         const haystack = [
             c.classCode,
             c.courseCode,

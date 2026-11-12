@@ -79,3 +79,35 @@ describe('ClassesService 多值筛选', () => {
     expect(codes({ department: ['不存在的学院', '也不存在'] })).toEqual([]);
   });
 });
+
+describe('ClassesService.findOne（单个教学班）', () => {
+  const service = new ClassesService();
+  const SEMESTER = '2026-2027-1';
+
+  it('命中时期望返回完整条目（含大纲链接）', () => {
+    const first = service.query({ semester: SEMESTER, pageSize: 1 }).items[0];
+    const item = service.findOne(SEMESTER, first.classCode);
+
+    expect(item).toBeDefined();
+    expect(item?.classCode).toBe(first.classCode);
+    expect(item?.courseName).toBe(first.courseName);
+    expect(item?.syllabusUrl).toContain('https://byyt.ecnu.edu.cn/');
+  });
+
+  it('学期不符时返回 undefined（教学班代码跨学期重复）', () => {
+    const first = service.query({ semester: SEMESTER, pageSize: 1 }).items[0];
+
+    expect(service.findOne('2025-2026-1', first.classCode)).toBeUndefined();
+  });
+
+  it('教学班不存在时返回 undefined', () => {
+    expect(service.findOne(SEMESTER, 'NOT-EXIST-99')).toBeUndefined();
+  });
+
+  it('缺少学期或代码时返回 undefined', () => {
+    const first = service.query({ semester: SEMESTER, pageSize: 1 }).items[0];
+
+    expect(service.findOne('', first.classCode)).toBeUndefined();
+    expect(service.findOne(SEMESTER, '')).toBeUndefined();
+  });
+});
