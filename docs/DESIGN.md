@@ -16,10 +16,11 @@
 | v1.9 | 2026-11-10 | Niazye | §4.3 拆分状态职责：新增 `searchStore` 持有搜索与筛选条件（**与学期解耦**），`courseStore` 只保留查询结果与筛选项缓存；条件相关纯函数移入 `core/search.ts`（`pruneSelections` / `buildQueryParams` 等）并新增 Vitest 前端单测与 `vitest.config.ts`；切换学期改为「先取筛选项→裁剪条件→再查询」 |
 | v1.10 | 2026-11-10 | Niazye | §4.3 条件改为**按学期记忆**：新增 `memory: Record<学期, FilterSelections>`，生效条件为 `clipSelections(memory[学期], 可用选项)`；纯函数调整为 `clipSelections` / `shelvedValues` / `mergeSelections`（原 `pruneSelections` 拆分），本学期不可用的选中值暂存于原学期记忆并在切回时恢复；条件写入 `localStorage`（`hydrangea.searchConditions.v1`）以便刷新后恢复 |
 | v1.11 | 2026-11-10 | Niazye | §4.3 简化为**全局一份条件**：`saved` 为唯一来源，`selections = clipSelections(saved, available)` 为当前学期生效部分，切换学期只换 `available`；`applyVisibleSelections` 取代 `mergeSelections`（勾选/取消都改这一份，当前学期用不到的值原样保留）；持久化键升为 `hydrangea.searchConditions.v2` |
+| v1.12 | 2026-11-12 | Niazye | 新增 IndexedDB 基座与**意向标记**：§2.6 明确 `marks` 独立 store 过渡模型（键 `[semester, classCode]`，字段含 `intent`/`scheduled`/`addedAt`）；§4.3 新增 `markStore` 职责、上限与降级规则；§4.4 写明数据库 `hydrangea` v1 的 `marks`/`settings` 结构（`plans` 随方案切片以 v2 加入）；§4.5 布局组件新增 `intentCodes` prop 与 `toggleIntent` 事件 |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
-| 文档版本 | v1.11 |
+| 文档版本 | v1.12 |
 | 编写日期 | 2026-09-23 |
 | 文档状态 | 完整版，待评审 |
 | 目标读者 | 前后端开发、测试、运维 |
@@ -186,6 +187,8 @@ flowchart LR
 > - `intent=true` 表示有意向标记；`scheduled=true` 表示已排（已排是意向的子集）。
 > - 移除意向时级联移除已排（`intent=false` 时 `scheduled` 强制为 `false`）。
 > - 占位条目：`intent=true` 但课程数据中不存在该 `classCode`。
+
+> **过渡模型（方案管理切片之前）**：`plans` store 尚未建立，标记先行存于独立的 `marks` store，键为 `[semester, classCode]`，条目字段与本表一致（`intent` / `scheduled` / `addedAt`，其中 `scheduled` 当前恒为 `false`）。引入方案管理时把 `marks` 归入 `plan.marks`（同一学期内共用同一批标记），属于纯数据搬迁，不改标记规则。
 
 ---
 
@@ -381,7 +384,7 @@ src/
 
 **布局元数据（`LAYOUT_META`）**：`ClassList.vue` 导出 `LAYOUT_META` 映射，声明每种布局对页面容器的需求（`container: 'normal' | 'wide'`）。`App.vue` 据此决定容器样式（如 `wide` 时加 `.app--wide` 类占满页面），**无需关心具体布局名**，避免与具体布局类型耦合。
 
-**新增一种布局**：新建 `layouts/*.vue`（只接收 `items`，用 `core/format.ts` 格式化），在 `ClassList.vue` 门面中注册一行分发，并在 `LAYOUT_META` 登记容器需求即可，不影响其他布局与业务代码，`App.vue` 无需改动。
+**新增一种布局**：新建 `layouts/*.vue`（接收 `items` 与 `intentCodes`，用 `core/format.ts` 格式化，并 `emit('toggleIntent', classCode)`），在 `ClassList.vue` 门面中注册一行分发，并在 `LAYOUT_META` 登记容器需求即可，不影响其他布局与业务代码，`App.vue` 无需改动。
 
 **未来加切换**：只需在搜索页某处维护一个 `layout` 状态并传给 `ClassList`，无需改动各布局组件。
 
@@ -391,6 +394,7 @@ src/
 | --- | --- | --- |
 | `uiStore` | 当前学期（`currentSemester`）、可用学期列表、副栏展开状态 | 已实现 |
 | `searchStore` | 搜索与筛选条件（关键词、四项选中值、分页），**与学期解耦** | 已实现 |
+| `markStore` | 当前学期的标记（意向/已排），读写 IndexedDB | 已实现（意向；已排随 S4） |
 | `courseStore` | 课程查询结果、当前学期的筛选项缓存 | 未实现（暂由 `App.vue` 持有） |
 | `planStore` | 当前方案、方案列表（按当前学期过滤）、标记操作 | 未实现 |
 
@@ -402,17 +406,34 @@ src/
 - 在任一学期取消勾选，会把该值从这唯一一份条件里移除（当前学期用不到的其他值原样保留）。
 - 关键词跨学期共用；分页在切换学期时回到第 1 页。
 
-**持久化**：条件以 `localStorage` 键 `hydrangea.searchConditions.v2` 保存（`{ keyword, selections }`），刷新页面后自动恢复；S2 引入 IndexedDB 后迁入 `settings`。
+**持久化**：条件以 `localStorage` 键 `hydrangea.searchConditions.v2` 保存（`{ keyword, selections }`），刷新页面后自动恢复；迁入 IndexedDB `settings` 留待后续切片。
 
 > 纯函数集中在 `core/search.ts`（`FILTER_KEYS` / `LEVEL_OPTIONS` / `emptySelections` / `availableOptionsOf` / `clipSelections` / `shelvedValues` / `applyVisibleSelections` / `buildQueryParams`），由 `src/core/search.spec.ts` 覆盖（Vitest，含 A→B→A 生效范围变化场景）。
 
+**标记（`markStore`，PRD §3.2.4/§3.2.8）**：
+
+- 状态只持有**当前学期**的标记：`load(semester)` 从 IndexedDB 读取，切换学期时重新读取（标记**按学期隔离**）。
+- `toggleIntent(classCode)` 调纯函数 `core/marks.ts#toggleIntent` 得到新列表与是否被上限阻止，再落库（`addMark` / `deleteMark`）。
+- 意向上限 `INTENT_LIMIT = 50`：达到上限后新增被阻止，`limitNotice` 提示（**不弹确认框**）；取消不受上限限制。
+- 本地存储不可用时：内存状态照常工作，`error` 给出提示，不阻塞查询。
+
+> 纯函数集中在 `core/marks.ts`（`INTENT_LIMIT` / `isIntent` / `intentCodes` / `toggleIntent`），由 `src/core/marks.spec.ts` 覆盖（新增、取消、上限阻止、上限时仍可取消、不可变更新）。
+
 ### 4.4 本地存储（IndexedDB）
 
-- 使用 `idb` 库封装 IndexedDB。
-- 存储 `plans`（方案列表）与 `settings`（当前学期/当前方案/搜索与筛选条件）。
+- 使用 `idb` 库封装，封装在 `src/storage/db.ts`（`openDb` / `listMarks` / `addMark` / `deleteMark` / `getSetting` / `setSetting`）。
+- 数据库 `hydrangea`，版本 `1`：
+
+| store | keyPath | 内容 |
+| --- | --- | --- |
+| `marks` | `['semester', 'classCode']` + 索引 `by-semester` | 标记条目 `{ semester, classCode, intent, scheduled, addedAt }` |
+| `settings` | `key` | 键值设置 `{ key, value }` |
+
+- `plans`（方案列表）随方案管理切片以**版本 2** 升级加入，不影响已有数据。
+- 标记**以 `[semester, classCode]` 为键**：教学班代码跨学期重复，必须与学期一起定位（§2.5）。
 - 提供「清空所有数据」入口（PRD §4 数据持久性）。
 
-> 过渡期：当前学期与搜索条件暂存于 `localStorage`（`hydrangea.currentSemester`、`hydrangea.searchConditions.v2`），S2 引入 `idb` 后一并迁入 `settings` 并清理这两个键。
+> 过渡期：当前学期与搜索条件仍存于 `localStorage`（`hydrangea.currentSemester`、`hydrangea.searchConditions.v2`），后续切片迁入 `settings` 并清理这两个键。
 
 ---
 
