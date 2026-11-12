@@ -4,9 +4,11 @@ import {
   intentCodes,
   isIntent,
   multiClassCourseCodes,
+  scheduledCodes,
   sortByAddedAt,
   splitPlaceholders,
   toggleIntent,
+  toggleScheduled,
   type IntentEntry,
 } from './marks'
 import type { IntentMark } from '../storage/db'
@@ -172,5 +174,37 @@ describe('multiClassCourseCodes', () => {
         { classCode: 'A002', addedAt: 2, course: null },
       ]),
     ).toEqual([])
+  })
+})
+
+describe('toggleScheduled（已排）', () => {
+  it('已打意向的教学班可以打已排', () => {
+    const { next, blocked } = toggleScheduled([mark('A001', 1)], 'A001')
+
+    expect(blocked).toBe(false)
+    expect(scheduledCodes(next)).toEqual(['A001'])
+  })
+
+  it('再次切换取消已排', () => {
+    const on = toggleScheduled([mark('A001', 1)], 'A001').next
+    const off = toggleScheduled(on, 'A001').next
+
+    expect(scheduledCodes(off)).toEqual([])
+    expect(intentCodes(off)).toEqual(['A001'])
+  })
+
+  it('未打意向的教学班不能打已排', () => {
+    const { next, blocked, reason } = toggleScheduled([mark('A001', 1)], 'B999')
+
+    expect(blocked).toBe(true)
+    expect(reason).toBe('not-intent')
+    expect(scheduledCodes(next)).toEqual([])
+  })
+
+  it('不修改入参', () => {
+    const original = [mark('A001', 1)]
+    toggleScheduled(original, 'A001')
+
+    expect(original[0].scheduled).toBe(false)
   })
 })

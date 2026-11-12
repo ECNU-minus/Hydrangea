@@ -1,13 +1,16 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { queryClass, type ClassItem } from '../api/classes'
+import type { TimetableSession } from '../core/conflict'
 import {
   INTENT_LIMIT,
   intentCodes,
   multiClassCourseCodes,
+  scheduledCodes,
   sortByAddedAt,
   splitPlaceholders,
   toggleIntent,
+  toggleScheduled,
   type IntentEntry,
   type ToggleResult,
 } from '../core/marks'
@@ -39,8 +42,37 @@ export const useMarkStore = defineStore('marks', () => {
   /** 已打意向标记的教学班代码 */
   const intents = computed(() => intentCodes(marks.value))
 
+  /** 已排教学班代码（进入课表，PRD §3.3） */
+  const scheduled = computed(() => scheduledCodes(marks.value))
+
   /** 意向数量 */
   const intentCount = computed(() => intents.value.length)
+
+  /** 已排数量 */
+  const scheduledCount = computed(() => scheduled.value.length)
+
+  /**
+   * 已排教学班（供课表与冲突检测使用）
+   *
+   * 只含已解析出课程详情的条目：占位条目没有上课时间，不进入课表（PRD §3.5）。
+   */
+  const scheduledSessions = computed<TimetableSession[]>(() =>
+    scheduled.value
+      .map((classCode) => details.value[classCode])
+      .filter((detail): detail is ClassItem => Boolean(detail))
+      .map((detail) => ({
+        classCode: detail.classCode,
+        courseName: detail.courseName,
+        teacher: detail.teacher,
+        schedule: detail.schedule,
+        weeks: detail.weeks,
+      })),
+  )
+
+  /** 某教学班是否已打已排标记 */
+  function isScheduled(classCode: string): boolean {
+    return scheduled.value.includes(classCode)
+  }
 
   /** 某教学班的展示信息：`undefined` = 未解析，`null` = 数据中不存在 */
   function courseOf(classCode: string): IntentEntry['course'] {
@@ -58,6 +90,7 @@ export const useMarkStore = defineStore('marks', () => {
         classCode: mark.classCode,
         addedAt: mark.addedAt,
         course: courseOf(mark.classCode),
+        scheduled: mark.scheduled,
       })),
   )
 
@@ -116,6 +149,35 @@ export const useMarkStore = defineStore('marks', () => {
     })
     details.value = next
     detailsLoading.value = false
+
+    await pruneMissingScheduled()
+  }
+
+  /**
+   * 数据中已不存在的教学班：级联移除它的已排标记（PRD §3.5）
+   *
+   * 占位条目没有上课时间，不能留在课表里。
+   */
+  async function pruneMissingScheduled(): Promise<void> {
+    const stale = marks.value.filter(
+      (mark) => mark.scheduled && details.value[mark.classCode] === null,
+    )
+
+    if (stale.length === 0) return
+
+    const next = marks.value.map((mark) =>
+      mark.scheduled && details.value[mark.classCode] === null ? { ...mark, scheduled: false } : mark,
+    )
+    marks.value = next
+
+    for (const mark of next) {
+      if (!stale.some((item) => item.classCode === mark.classCode)) continue
+      try {
+        await addMark(mark)
+      } catch (e) {
+        error.value = e instanceof Error ? e.message : '本地标记保存失败'
+      }
+    }
   }
 
   /** 落库：添加或删除单条（失败只提示，内存状态保留） */
@@ -149,9 +211,40 @@ export const useMarkStore = defineStore('marks', () => {
     await persist(result, classCode)
   }
 
-  /** 移除意向（意向列表中直接移除，PRD §3.2.8） */
+  /** 移除意向（意向列表中直接移除，PRD §3.2.8）；已排随之移除 */
   async function removeIntent(classCode: string): Promise<void> {
     if (hasIntent(classCode)) await toggleIntentOf(classCode)
+  }
+
+  /**
+   * 切换已排标记（排课页打标，PRD §3.2.4）
+   *
+   * 已排是意向的子集；占位条目不能打已排（PRD §3.5）。
+   */
+  async function toggleScheduledOf(classCode: string): Promise<void> {
+    // 占位条目：数据中已不存在，禁止打已排
+    if (details.value[classCode] === null) {
+      limitNotice.value = '该教学班在当前学期数据中不存在，不能打已排标记'
+      return
+    }
+
+    const result = toggleScheduled(marks.value, classCode)
+
+    if (result.blocked) {
+      limitNotice.value = '只能给已打意向标记的课程打已排标记'
+      return
+    }
+
+    limitNotice.value = ''
+    marks.value = result.next
+
+    const current = result.next.find((mark) => mark.classCode === classCode)
+    try {
+      if (current) await addMark(current)
+      error.value = ''
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '本地标记保存失败'
+    }
   }
 
   /** 场景变化（如切换学期）时清除一次性提示 */
@@ -168,14 +261,19 @@ export const useMarkStore = defineStore('marks', () => {
     error,
     limitNotice,
     intents,
+    scheduled,
     intentCount,
+    scheduledCount,
     intentEntries,
     intentGroups,
     multiClassCourses,
+    scheduledSessions,
     hasIntent,
+    isScheduled,
     load,
     resolveDetails,
     toggleIntentOf,
+    toggleScheduledOf,
     removeIntent,
     clearNotice,
   }

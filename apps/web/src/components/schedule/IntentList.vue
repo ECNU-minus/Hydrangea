@@ -28,6 +28,9 @@ const multiClassNotice = computed(() =>
     <h2 class="intent-list__title">
       意向列表
       <span class="intent-list__count">{{ markStore.intentCount }}</span>
+      <span v-if="markStore.scheduledCount > 0" class="intent-list__scheduled">
+        已排 {{ markStore.scheduledCount }}
+      </span>
     </h2>
 
     <p v-if="markStore.loading" class="intent-list__hint">加载中…</p>
@@ -59,6 +62,19 @@ const multiClassNotice = computed(() =>
             </span>
             <span class="intent-item__time">{{ formatDateTime(entry.addedAt) }}</span>
           </div>
+          <label
+            class="intent-item__toggle"
+            :title="entry.course === null ? '占位条目不能打已排' : '已排后进入课表'"
+          >
+            <input
+              type="checkbox"
+              :checked="entry.scheduled === true"
+              :disabled="entry.course === null"
+              :aria-label="`${entry.classCode} 已排`"
+              @change="markStore.toggleScheduledOf(entry.classCode)"
+            />
+            <span>已排</span>
+          </label>
           <button
             type="button"
             class="intent-item__remove"
@@ -85,6 +101,10 @@ const multiClassNotice = computed(() =>
               <span class="intent-item__code">{{ entry.classCode }}</span>
               <span class="intent-item__time">{{ formatDateTime(entry.addedAt) }}</span>
             </div>
+            <label class="intent-item__toggle" title="占位条目不能打已排">
+              <input type="checkbox" disabled :aria-label="`${entry.classCode} 已排（占位条目不可用）`" />
+              <span>已排</span>
+            </label>
             <button
               type="button"
               class="intent-item__remove"
@@ -121,6 +141,36 @@ const multiClassNotice = computed(() =>
   font-family: var(--mono);
   font-size: 0.85em;
   color: var(--accent);
+}
+
+.intent-list__scheduled {
+  font-family: var(--mono);
+  font-size: 0.8em;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 6px;
+}
+
+/* 已排开关 */
+.intent-item__toggle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78em;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.intent-item__toggle input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.intent-item__toggle input:disabled {
+  cursor: not-allowed;
 }
 
 .intent-list__hint {

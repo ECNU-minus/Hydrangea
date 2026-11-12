@@ -68,10 +68,15 @@ export async function listMarks(semester: string): Promise<IntentMark[]> {
   return marks.sort((a: IntentMark, b: IntentMark) => a.addedAt - b.addedAt)
 }
 
-/** 新增一条标记 */
+/**
+ * 新增一条标记
+ *
+ * 入参可能是 Vue 的响应式代理，结构化克隆无法复制代理对象，
+ * 故这里统一浅拷贝成普通对象再写入。
+ */
 export async function addMark(mark: IntentMark): Promise<void> {
   const db = await openDb()
-  await db.put('marks', mark)
+  await db.put('marks', { ...mark })
 }
 
 /** 删除一条标记（取消意向；已排随之移除） */
@@ -88,8 +93,8 @@ export async function getSetting<T>(key: string): Promise<T | undefined> {
   return record?.value as T | undefined
 }
 
-/** 写入设置项 */
+/** 写入设置项（同样避免直接写入响应式代理） */
 export async function setSetting<T>(key: string, value: T): Promise<void> {
   const db = await openDb()
-  await db.put('settings', { key, value })
+  await db.put('settings', { key, value: JSON.parse(JSON.stringify(value)) as T })
 }

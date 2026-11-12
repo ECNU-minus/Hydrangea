@@ -63,6 +63,46 @@ export interface IntentEntry {
   addedAt: number
   /** 教学班详情：`undefined` = 未解析，`null` = 数据中不存在（占位条目） */
   course?: { courseCode: string; courseName: string } | null
+  /** 是否已打已排标记 */
+  scheduled?: boolean
+}
+
+/** 切换已排的结果 */
+export interface ScheduledToggleResult {
+  /** 变更后的标记列表（不可变更新） */
+  next: IntentMark[]
+  /** 未变更的原因：`not-intent` = 尚未打意向，`blocked` = 被拒绝 */
+  blocked: boolean
+  reason?: 'not-intent'
+}
+
+/** 已打已排标记的教学班代码（进入课表，PRD §3.3） */
+export function scheduledCodes(marks: readonly IntentMark[]): string[] {
+  return marks.filter((mark) => mark.intent && mark.scheduled).map((mark) => mark.classCode)
+}
+
+/**
+ * 切换某教学班的已排标记（PRD §3.2.4、DESIGN §2.6）
+ *
+ * 已排是意向的子集：只有已打意向标记的教学班才能打已排，否则不做变更并返回 `reason`。
+ * 冲突允许排入，不做阻止（PRD §3.3.2）。
+ */
+export function toggleScheduled(
+  marks: readonly IntentMark[],
+  classCode: string,
+): ScheduledToggleResult {
+  const target = marks.find((mark) => mark.classCode === classCode && mark.intent)
+
+  if (!target) {
+    return { next: [...marks], blocked: true, reason: 'not-intent' }
+  }
+
+  return {
+    next: marks.map((mark) =>
+      mark === target ? { ...mark, scheduled: !mark.scheduled } : mark,
+    ),
+    blocked: false,
+  }
 }
 
 /** 按添加时间升序（先加的在上，PRD §3.2.8）；不修改入参 */
