@@ -96,6 +96,8 @@ pnpm test             # 运行全部测试
 
 后端另有 `pnpm --filter server test:e2e`（e2e 测试）、`pnpm --filter server lint`（oxlint）；前端 `pnpm --filter web test`（Vitest，覆盖 `core/` 纯函数）。
 
+**工具链版本**：Node 版本由根目录 `.nvmrc` 固定（`fnm`/`nvm` 进入目录时自动切换）；包管理器为 pnpm（以系统/全局安装的 pnpm 为准，本机为 12.18.0）。根 `package.json` 刻意**不记录** `packageManager` 字段——pnpm 会据此把自身二进制写进 `pnpm-lock.yaml`（+150 余行）；也不提交 `package-lock.json`（已在 `.gitignore` 中忽略），避免 npm 与 pnpm 混用。
+
 ## 协作模式：垂直切片迭代
 
 项目按**垂直切片**迭代推进。每个迭代是一个可独立交付的成果，从目标澄清到验证完整走一遍。
