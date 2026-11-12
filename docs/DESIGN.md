@@ -19,6 +19,7 @@
 | v1.12 | 2026-11-12 | Niazye | 新增 IndexedDB 基座与**意向标记**：§2.6 明确 `marks` 独立 store 过渡模型（键 `[semester, classCode]`，字段含 `intent`/`scheduled`/`addedAt`）；§4.3 新增 `markStore` 职责、上限与降级规则；§4.4 写明数据库 `hydrangea` v1 的 `marks`/`settings` 结构（`plans` 随方案切片以 v2 加入）；§4.5 布局组件新增 `intentCodes` prop 与 `toggleIntent` 事件 |
 | v1.13 | 2026-11-12 | Niazye | 新增**路由与排课页骨架**：§3.5 落地 `GET /api/classes/:classCode?semester=`（200/400/404）供意向列表回查课程信息；§4.1 路由表标注现状并说明壳层/学期下拉职责；§4.2 组件树补 `views/`、`router/`、`layout/SemesterBar.vue`、`schedule/IntentList.vue`；§4.3 补 `markStore` 的详情回查、占位条目分组、多教学班提示与移除意向 |
 | v1.14 | 2026-11-13 | Niazye | 新增**已排标记与周课表**：§4.3 补 `markStore` 的已排职责（`scheduledSessions`、`toggleScheduledOf`、占位条目级联清除已排、存储边界浅拷贝）；§4.2 组件树补 `schedule/TimetableGrid.vue`；§7.1–§7.3 标注已实现并写清 `core/conflict.ts`、`core/timetable.ts`、`core/weeks.ts`、`core/slots.ts` 的分工；§4.1 排课页状态更新为已实现（方案管理待做） |
+| v1.15 | 2026-11-13 | Niazye | 新增**排课方案管理**：§2.6 方案与标记改为 `plans` + `planMarks` 两个 store（按 `planId` 关联），补 v1→v2 迁移说明；§4.2 组件树补 `schedule/PlanBar.vue`；§4.3 新增 `planStore` 职责与方案规则（≤10 个、默认名「方案 N」、每学期记住当前方案、删到最后一个自动新建），`markStore` 改为**方案作用域**；§4.4 写清数据库 v2 结构与三步迁移 |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
@@ -156,12 +157,15 @@ flowchart LR
 
 ### 2.6 用户数据（前端 IndexedDB）
 
-用户数据**不建表、不入库**，存于浏览器 IndexedDB。数据结构：
+用户数据**不建表、不入库**，存于浏览器 IndexedDB。数据结构（数据库 v2）：
 
 | 存储对象 | 内容 |
 | --- | --- |
-| `plans` | 排课方案列表（含名称、学期、标记） |
-| `settings` | 全局设置（当前学期、当前方案等） |
+| `plans` | 排课方案（`{ id, semester, name, createdAt }`），索引 `by-semester` |
+| `planMarks` | 方案标记（`{ planId, semester, classCode, intent, scheduled, addedAt }`），主键 `[planId, classCode]`，索引 `by-plan` |
+| `settings` | 全局设置（当前学期、**每学期当前方案** `currentPlan:<semester>`、迁移标记等） |
+
+> **为什么方案与标记分两个 store**：标记只写一条记录即可切换，不必读改写整个方案；`listMarks(planId)` 直取当前方案，也为将来的「复制方案 / 方案级导出」留出余地。方案与标记通过 `planId` 关联。
 
 > `settings.currentSemester` 保存用户当前查看的学期（PRD §3.6.5）；默认取后端学期列表中的当前学期，若不存在则回退到最新学期。
 
@@ -172,25 +176,26 @@ flowchart LR
   "id": "uuid",
   "name": "方案 1",
   "semester": "2026-2027-1",
-  "marks": [
-    { "classCode": "A001", "intent": true, "scheduled": true, "addedAt": 1234567890 }
-  ]
+  "createdAt": 1234567890
 }
 ```
 
 | 字段 | 说明 |
 | --- | --- |
-| `id` | 方案唯一标识 |
-| `name` | 方案名称（允许重名） |
+| `id` | 方案唯一标识（`crypto.randomUUID()`，不可用时退化为时间戳随机串） |
+| `name` | 方案名称（允许重名；非空、去首尾空白、超 40 字截断） |
 | `semester` | 绑定学期（格式见 2.5；方案创建时绑定，不随学期切换改变，PRD §3.5） |
-| `marks` | 标记列表，`intent`=意向，`scheduled`=已排 |
+| `createdAt` | 创建时间戳，方案按此**升序**排列 |
+
+**标记条目（`planMarks`）**：`{ planId, semester, classCode, intent, scheduled, addedAt }`。
 
 > **标记规则**（PRD §3.2）：
 > - `intent=true` 表示有意向标记；`scheduled=true` 表示已排（已排是意向的子集）。
 > - 移除意向时级联移除已排（`intent=false` 时 `scheduled` 强制为 `false`）。
 > - 占位条目：`intent=true` 但课程数据中不存在该 `classCode`。
+> - 标记**归属某个方案**，不同方案之间互不影响（同一门课可以同时出现在多个方案里）。
 
-> **过渡模型（方案管理切片之前）**：`plans` store 尚未建立，标记先行存于独立的 `marks` store，键为 `[semester, classCode]`，条目字段与本表一致（`intent` / `scheduled` / `addedAt`，其中 `scheduled` 当前恒为 `false`）。引入方案管理时把 `marks` 归入 `plan.marks`（同一学期内共用同一批标记），属于纯数据搬迁，不改标记规则。
+> **v1 → v2 迁移**：v1 的 `marks` store（键 `[semester, classCode]`）在升级时**原样保留**，升级只新建 `plans` / `planMarks`；打开后把旧标记按学期折叠成各自的「方案 1」（含 `currentPlan:<semester>`），成功才写迁移标记（详见 §4.4）。因此升级失败也不会丢数据，可重试。
 
 ---
 
@@ -346,7 +351,7 @@ flowchart LR
 | 路由 | 页面 | 职责 | 现状 |
 | --- | --- | --- | --- |
 | `/search` | 搜索页（`views/SearchPage.vue`） | 查询、筛选、打意向标记 | 已实现 |
-| `/schedule` | 排课页（`views/SchedulePage.vue`） | 查看课表、打已排标记、方案管理 | 已实现（意向列表 + 已排 + 周课表；方案管理待做） |
+| `/schedule` | 排课页（`views/SchedulePage.vue`） | 查看课表、打已排标记、方案管理 | 已实现（意向列表 + 已排 + 周课表 + 方案管理） |
 
 > `/` 重定向到 `/search`；未知路径同样回到 `/search`。页面外壳（页头 + 页签 + `RouterView`）在 `App.vue`，学期列表在壳里加载一次，副栏学期下拉由 `components/layout/SemesterBar.vue` 提供（两页共用，切换后各自响应并重新加载该学期的标记）。
 
@@ -381,6 +386,7 @@ src/
 │   │       ├── CardLayout.vue      # 卡片布局（移动端）
 │   │       └── WideTableLayout.vue # 宽表格布局（桌面端）
 │   ├── schedule/            # 排课页组件
+│   │   ├── PlanBar.vue      # 副栏方案区（切换 / 新建 / 重命名 / 删除，达上限提示）
 │   │   ├── IntentList.vue   # 副栏意向列表（占位条目、多教学班提示、已排开关、移除意向）
 │   │   └── TimetableGrid.vue # 主栏周课表（周次圆点、冲突标红）
 │   ├── export/              # 导出组件
@@ -421,9 +427,9 @@ src/
 | --- | --- | --- |
 | `uiStore` | 当前学期（`currentSemester`）、可用学期列表、副栏展开状态 | 已实现 |
 | `searchStore` | 搜索与筛选条件（关键词、四项选中值、分页），**与学期解耦** | 已实现 |
-| `markStore` | 当前学期的标记（意向/已排），读写 IndexedDB，按需回查教学班详情 | 已实现（意向；已排随 S4） |
+| `markStore` | **当前方案**的标记（意向/已排），读写 IndexedDB，按需回查教学班详情 | 已实现 |
+| `planStore` | 当前学期的方案列表、当前方案、方案增删改名 | 已实现 |
 | `courseStore` | 课程查询结果、当前学期的筛选项缓存 | 未实现（暂由 `App.vue` 持有） |
-| `planStore` | 当前方案、方案列表（按当前学期过滤）、标记操作 | 未实现 |
 
 **搜索/筛选条件与学期解耦**（PRD §3.6.5）：
 
@@ -437,10 +443,20 @@ src/
 
 > 纯函数集中在 `core/search.ts`（`FILTER_KEYS` / `LEVEL_OPTIONS` / `emptySelections` / `availableOptionsOf` / `clipSelections` / `shelvedValues` / `applyVisibleSelections` / `buildQueryParams`），由 `src/core/search.spec.ts` 覆盖（Vitest，含 A→B→A 生效范围变化场景）。
 
-**标记（`markStore`，PRD §3.2.4/§3.2.8）**：
+**方案管理（`planStore`，PRD §3.5）**：
 
-- 状态只持有**当前学期**的标记：`load(semester)` 从 IndexedDB 读取，切换学期时重新读取（标记**按学期隔离**）。
-- `toggleIntent(classCode)` 调纯函数 `core/marks.ts#toggleIntent` 得到新列表与是否被上限阻止，再落库（`addMark` / `deleteMark`）。
+- 状态：`semester`（方案所属学期）、`plans`（该学期的方案，按 `createdAt` 升序）、`currentPlanId`、`currentPlan`、`planCount`、`canCreate`（`canAddPlan(plans)`，上限 `PLAN_LIMIT = 10`）、`notice`。
+- `load(semester)`：读取该学期方案 → 恢复上次选中的方案（`settings.currentPlan:<semester>`，失效则取第一个）→ 一个都没有时**自动建「方案 1」** → 载入该方案的标记。同一学期重复调用为空操作。
+- `selectPlan(id)`：切换当前方案并重新加载该方案标记（`markStore.load(semester, id)` + `resolveDetails()`），把选择写回 `settings`。
+- `createPlan()`：名称取 `defaultPlanName(plans)`（已有「方案 N」的最大 N+1，删除后可复用编号）；达上限时拒绝并给 `notice`；成功后自动切到新方案。
+- `renamePlanOf(id, name)`：规范化（去空白、压缩空格、截断 40 字）后落库；**空名拒绝**，允许重名。
+- `removePlanOf(id)`：删除方案及其标记；删的是当前方案则切到剩余第一个；**删掉最后一个后自动新建「方案 1」**，保证每学期始终有可用方案。
+- 两页共用副栏学期下拉（`layout/SemesterBar.vue`）：学期变化 → `planStore.load()` → 内部加载当前方案标记 → `markStore.resolveDetails()`。
+
+**标记（`markStore`，PRD §3.2.4/§3.2.8；按**方案**作用域）**：
+
+- 状态只持有**当前方案**的标记：`load(semester, planId)` 从 IndexedDB 读取；切换方案或学期时重新读取（标记**按方案隔离**）。
+- `toggleIntent(classCode)` 调纯函数 `core/marks.ts#toggleIntent` 得到新列表与是否被上限阻止，再落库（`putMark` / `deleteMark`）。
 - 意向上限 `INTENT_LIMIT = 50`：达到上限后新增被阻止，`limitNotice` 提示（**不弹确认框**）；取消不受上限限制。
 - 本地存储不可用时：内存状态照常工作，`error` 给出提示，不阻塞查询。
 
@@ -452,7 +468,7 @@ src/
 - `multiClassCourses`：`multiClassCourseCodes` 找出被打标了 ≥2 个教学班的课程代码；列表顶部提示 + 条目「多教学班」标签（PRD §3.2.6）。
 - `removeIntent(classCode)`：直接移除意向（无确认框），同步删除 IndexedDB 记录。
 
-> 纯函数集中在 `core/marks.ts`（`INTENT_LIMIT` / `isIntent` / `intentCodes` / `toggleIntent` / `sortByAddedAt` / `splitPlaceholders` / `multiClassCourseCodes`），由 `src/core/marks.spec.ts` 覆盖。
+> 纯函数集中在 `core/marks.ts`（`INTENT_LIMIT` / `isIntent` / `intentCodes` / `toggleIntent` / `sortByAddedAt` / `splitPlaceholders` / `multiClassCourseCodes`）与 `core/plans.ts`（`PLAN_LIMIT` / `canAddPlan` / `defaultPlanName` / `normalizePlanName` / `isValidPlanName` / `sortPlansByCreated` / `renamePlan`），分别由 `src/core/marks.spec.ts`、`src/core/plans.spec.ts` 覆盖。
 
 **已排标记与课表（PRD §3.3）**：
 
@@ -466,16 +482,21 @@ src/
 
 ### 4.4 本地存储（IndexedDB）
 
-- 使用 `idb` 库封装，封装在 `src/storage/db.ts`（`openDb` / `listMarks` / `addMark` / `deleteMark` / `getSetting` / `setSetting`）。
-- 数据库 `hydrangea`，版本 `1`：
+- 使用 `idb` 库封装，封装在 `src/storage/db.ts`（`openDb` / `listPlans` / `putPlan` / `removePlan` / `listMarks` / `putMark` / `deleteMark` / `getSetting` / `setSetting`）。
+- 数据库 `hydrangea`，版本 `2`：
 
 | store | keyPath | 内容 |
 | --- | --- | --- |
-| `marks` | `['semester', 'classCode']` + 索引 `by-semester` | 标记条目 `{ semester, classCode, intent, scheduled, addedAt }` |
-| `settings` | `key` | 键值设置 `{ key, value }` |
+| `plans` | `id` + 索引 `by-semester` | 方案 `{ id, semester, name, createdAt }` |
+| `planMarks` | `['planId', 'classCode']` + 索引 `by-plan` | 标记条目 `{ planId, semester, classCode, intent, scheduled, addedAt }` |
+| `settings` | `key` | 键值设置 `{ key, value }`（含 `currentPlan:<semester>`、`legacyMarksMigrated`） |
+| `marks`（v1 遗留） | `['semester', 'classCode']` | 旧标记，迁移后不再读写，留待后续版本清理 |
 
-- `plans`（方案列表）随方案管理切片以**版本 2** 升级加入，不影响已有数据。
-- 标记**以 `[semester, classCode]` 为键**：教学班代码跨学期重复，必须与学期一起定位（§2.5）。
+- 标记**以 `[planId, classCode]` 为键**：同一学期内不同方案可能包含同一教学班，必须与方案一起定位；`semester` 字段保留用于跨学期过滤。
+- **v1 → v2 迁移**（三步，均可在失败后重试，不丢数据）：
+  1. 升级事务只做 schema 变更：新建 `plans`、`planMarks`，**不删除**旧 `marks`；
+  2. 打开后读取旧 `marks`，按学期各建一个「方案 1」，把旧标记改写进 `planMarks`（一个读写事务内完成）；
+  3. 成功后写 `settings.legacyMarksMigrated = true`，后续打开直接跳过。
 - 提供「清空所有数据」入口（PRD §4 数据持久性）。
 
 > 过渡期：当前学期与搜索条件仍存于 `localStorage`（`hydrangea.currentSemester`、`hydrangea.searchConditions.v2`），后续切片迁入 `settings` 并清理这两个键。

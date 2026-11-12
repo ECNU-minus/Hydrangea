@@ -16,7 +16,7 @@
 项目已进入**功能切片迭代**阶段，奠基迭代（需求与设计）已完成。
 
 **已完成**
-- 需求与设计文档：`docs/PRD.md`（v1.6）、`docs/DESIGN.md`（v1.14）。
+- 需求与设计文档：`docs/PRD.md`（v1.6）、`docs/DESIGN.md`（v1.15）。
 - 后端：NestJS 只读查询 API，基于 `seed.ts` 种子数据（4 个学期、52 条，尚未接入 SQLite）。
   - `GET /api/classes`：关键词 + 四项筛选（每项可多选，同项或、跨项与）+ 分页，按学期过滤。
   - `GET /api/classes/:classCode`：单个教学班详情（需带 `semester`，缺参 400 / 不存在 404）。
@@ -26,12 +26,12 @@
   - 副栏学期下拉（`uiStore`）：切换后重查课程与筛选项，并记住上次选择。
   - 搜索条件（`searchStore`）：关键词 + 四项复选筛选 + 分页，**全局只保存一份**；勾选/取消都改这一份，切换学期时按该学期是否存在该选项决定是否生效（不存在的暂不生效、保留并在切回时恢复）；纯函数在 `core/search.ts`（有 Vitest 单测），条件写入 localStorage，刷新后恢复。
   - 三项选项由后端动态提供、培养层次固定三个；搜索结果多布局：桌面端 `wide-table`、移动端 `card`，随视口自适应（断点 768px）。
-  - 意向标记（`markStore`）：搜索结果每行「意向」星标，点击即生效（无确认框），上限 50 门；标记**按学期隔离**，存于 IndexedDB `hydrangea`（`marks` store，键 `[semester, classCode]`），刷新后仍在；本地存储不可用时的降级与提示。
+  - 意向标记（`markStore`）：搜索结果每行「意向」星标，点击即生效（无确认框），上限 50 门；标记**按方案隔离**，存于 IndexedDB `hydrangea`（`planMarks` store，键 `[planId, classCode]`），刷新后仍在；本地存储不可用时的降级与提示。
   - 排课页副栏**意向列表**：按添加时间升序，显示课程名称/课程代码/教学班代码/添加时间；同一课程多教学班有提示与标签；数据中不存在的教学班作为占位条目单独分组；条目可直接移除意向。
   - **已排标记与周课表**：在排课页对意向课程勾选「已排」即进入课表（冲突允许排入）；课表为周一至周日 × 14 节次，节次区间用跨行表现，周次用小圆点表示（有课填充 / 无课描线 / 冲突方形），冲突课程名称标红并在上方提示；支持「全部周次 / 第 N 周」切换；占位条目不能打已排，且数据中消失的教学班会自动清除已排标记。
+  - **排课方案管理**（`planStore` + `schedule/PlanBar.vue`）：每学期最多 10 个方案，默认名「方案 N」（删除后可复用编号），允许重名；副栏可下拉切换、新建、就地重命名（Enter 保存 / Esc 取消）、两步确认删除；方案绑定学期，切学期只显示该学期的方案并恢复该学期上次选中的方案；不同方案的意向/已排互不影响；删掉最后一个方案会自动新建「方案 1」。DB 升到 v2，v1 的旧标记按学期迁入各自的「方案 1」。
 
 **未完成（后续切片）**
-- 排课方案管理（`plans` store，DB 升到 v2）。
 - 导出（ICS / PNG / 排课码 / 教学班代码文本）与导入。
 - 把 `localStorage` 的当前学期与搜索条件迁入 IndexedDB `settings`。
 - SQLite 接入与爬虫数据替换（当前为种子数据）。
@@ -52,9 +52,9 @@
 | --- | --- | --- |
 | 架构 | 前后端分离 | 前端 SPA + 后端只读查询 API |
 | 前端框架 | Vue 3 + TypeScript + Vite | 组合式 API |
-| 前端状态 | Pinia | 全局状态管理（已引入：`stores/uiStore.ts`、`stores/searchStore.ts`、`stores/markStore.ts`） |
+| 前端状态 | Pinia | 全局状态管理（已引入：`stores/uiStore.ts`、`stores/searchStore.ts`、`stores/markStore.ts`、`stores/planStore.ts`） |
 | 前端 UI | Material You（MD3） | 视觉风格 |
-| 前端本地存储 | IndexedDB（idb 封装） | 用户数据（标记/方案）持久化（已引入：`storage/db.ts`，DB `hydrangea` v1） |
+| 前端本地存储 | IndexedDB（idb 封装） | 用户数据（方案/标记）持久化（已引入：`storage/db.ts`，DB `hydrangea` v2） |
 | 后端框架 | NestJS + TypeScript | 只读查询 API |
 | 后端数据库 | SQLite（better-sqlite3） | 课程数据（尚未接入，当前用种子数据） |
 | 爬虫 | Python 独立脚本 | **独立仓库**，不入本仓库 |
