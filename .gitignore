@@ -28,3 +28,6 @@ Thumbs.db
 
 # data (SQLite volume)
 data/
+
+# npm lockfile（本项目用 pnpm；勿把 npm 生成的锁文件提交）
+package-lock.json
