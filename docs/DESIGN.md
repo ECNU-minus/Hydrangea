@@ -17,10 +17,11 @@
 | v1.10 | 2026-11-10 | Niazye | §4.3 条件改为**按学期记忆**：新增 `memory: Record<学期, FilterSelections>`，生效条件为 `clipSelections(memory[学期], 可用选项)`；纯函数调整为 `clipSelections` / `shelvedValues` / `mergeSelections`（原 `pruneSelections` 拆分），本学期不可用的选中值暂存于原学期记忆并在切回时恢复；条件写入 `localStorage`（`hydrangea.searchConditions.v1`）以便刷新后恢复 |
 | v1.11 | 2026-11-10 | Niazye | §4.3 简化为**全局一份条件**：`saved` 为唯一来源，`selections = clipSelections(saved, available)` 为当前学期生效部分，切换学期只换 `available`；`applyVisibleSelections` 取代 `mergeSelections`（勾选/取消都改这一份，当前学期用不到的值原样保留）；持久化键升为 `hydrangea.searchConditions.v2` |
 | v1.12 | 2026-11-12 | Niazye | 新增 IndexedDB 基座与**意向标记**：§2.6 明确 `marks` 独立 store 过渡模型（键 `[semester, classCode]`，字段含 `intent`/`scheduled`/`addedAt`）；§4.3 新增 `markStore` 职责、上限与降级规则；§4.4 写明数据库 `hydrangea` v1 的 `marks`/`settings` 结构（`plans` 随方案切片以 v2 加入）；§4.5 布局组件新增 `intentCodes` prop 与 `toggleIntent` 事件 |
+| v1.13 | 2026-11-12 | Niazye | 新增**路由与排课页骨架**：§3.5 落地 `GET /api/classes/:classCode?semester=`（200/400/404）供意向列表回查课程信息；§4.1 路由表标注现状并说明壳层/学期下拉职责；§4.2 组件树补 `views/`、`router/`、`layout/SemesterBar.vue`、`schedule/IntentList.vue`；§4.3 补 `markStore` 的详情回查、占位条目分组、多教学班提示与移除意向 |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
-| 文档版本 | v1.12 |
+| 文档版本 | v1.13 |
 | 编写日期 | 2026-09-23 |
 | 文档状态 | 完整版，待评审 |
 | 目标读者 | 前后端开发、测试、运维 |
@@ -313,6 +314,26 @@ flowchart LR
 > - 学期标识解析规则见 §2.5；前端据此渲染副栏学期下拉框（PRD §3.2.1），切换后重置分页、重新拉取课程与筛选项。
 > - 前端会记住用户**上次选择**的学期，仅当它仍在 `semesters` 中时优先生效（PRD §3.6.5 的「当前学期」作为回退）。
 
+### 3.5 获取单个教学班 `GET /api/classes/:classCode`
+
+意向列表只保存教学班代码，展示所需的课程名称/代码需按代码回查（PRD §3.2.8）。
+
+**请求参数**：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `semester` | string | 学期标识（**必填**；教学班代码跨学期重复，见 §2.5） |
+
+**响应**：单个教学班对象，字段与 `/api/classes` 的 `items[]` 元素一致（§3.2）。
+
+| 情况 | 状态码 | 说明 |
+| --- | --- | --- |
+| 命中 | `200` | 返回该教学班对象 |
+| 缺少 `semester` | `400` | `{ message: '缺少必填参数 semester' }` |
+| 该学期无此教学班 | `404` | 前端据此渲染**占位条目**（PRD §3.2.8） |
+
+> 前端客户端为 `api/classes.ts#queryClass`，404 转成 `null` 交由 `markStore` 缓存为「数据中不存在」。
+
 ---
 
 ## 4. 前端设计
@@ -321,10 +342,12 @@ flowchart LR
 
 双页面（PRD §3.2.1），路由：
 
-| 路由 | 页面 | 职责 |
-| --- | --- | --- |
-| `/search` | 搜索页 | 查询、筛选、打意向标记 |
-| `/schedule` | 排课页 | 查看课表、打已排标记、方案管理 |
+| 路由 | 页面 | 职责 | 现状 |
+| --- | --- | --- | --- |
+| `/search` | 搜索页（`views/SearchPage.vue`） | 查询、筛选、打意向标记 | 已实现 |
+| `/schedule` | 排课页（`views/SchedulePage.vue`） | 查看课表、打已排标记、方案管理 | 部分实现（副栏意向列表；课表与已排待做） |
+
+> `/` 重定向到 `/search`；未知路径同样回到 `/search`。页面外壳（页头 + 页签 + `RouterView`）在 `App.vue`，学期列表在壳里加载一次，副栏学期下拉由 `components/layout/SemesterBar.vue` 提供（两页共用，切换后各自响应并重新加载该学期的标记）。
 
 **布局**：两页均左右分栏，左侧副栏（搜索/筛选/意向列表/方案管理/学期切换），右侧主栏（结果/课表）。窄屏用汉堡按钮展开/收起副栏。
 
@@ -356,11 +379,14 @@ src/
 │   │   └── layouts/         # 各布局组件，互不依赖
 │   │       ├── CardLayout.vue      # 卡片布局（移动端）
 │   │       └── WideTableLayout.vue # 宽表格布局（桌面端）
+│   ├── layout/              # 页面骨架：SemesterBar.vue（副栏学期选择）
 │   ├── schedule/            # 排课页组件
+│   │   └── IntentList.vue   # 副栏意向列表（占位条目、多教学班提示、移除意向）
 │   ├── export/              # 导出组件
 │   ├── import/              # 导入组件
 │   └── common/              # 通用组件
-└── views/                   # 页面
+├── views/                   # 页面（SearchPage.vue、SchedulePage.vue）
+└── router/                  # 路由表（vue-router）
 ```
 
 > **核心原则**：`core/` 与 `codec/` 为**纯函数**，零框架依赖，便于单元测试与复用。
@@ -394,7 +420,7 @@ src/
 | --- | --- | --- |
 | `uiStore` | 当前学期（`currentSemester`）、可用学期列表、副栏展开状态 | 已实现 |
 | `searchStore` | 搜索与筛选条件（关键词、四项选中值、分页），**与学期解耦** | 已实现 |
-| `markStore` | 当前学期的标记（意向/已排），读写 IndexedDB | 已实现（意向；已排随 S4） |
+| `markStore` | 当前学期的标记（意向/已排），读写 IndexedDB，按需回查教学班详情 | 已实现（意向；已排随 S4） |
 | `courseStore` | 课程查询结果、当前学期的筛选项缓存 | 未实现（暂由 `App.vue` 持有） |
 | `planStore` | 当前方案、方案列表（按当前学期过滤）、标记操作 | 未实现 |
 
@@ -417,7 +443,15 @@ src/
 - 意向上限 `INTENT_LIMIT = 50`：达到上限后新增被阻止，`limitNotice` 提示（**不弹确认框**）；取消不受上限限制。
 - 本地存储不可用时：内存状态照常工作，`error` 给出提示，不阻塞查询。
 
-> 纯函数集中在 `core/marks.ts`（`INTENT_LIMIT` / `isIntent` / `intentCodes` / `toggleIntent`），由 `src/core/marks.spec.ts` 覆盖（新增、取消、上限阻止、上限时仍可取消、不可变更新）。
+**意向列表（`components/schedule/IntentList.vue`，PRD §3.2.8）**：
+
+- `intentEntries`：标记按 `addedAt` 升序（`sortByAddedAt`），并附带回查到的课程信息。
+- `resolveDetails()`：对尚未解析的教学班代码并发调用 `GET /api/classes/:classCode`；**404 记为 `null`**（数据中不存在），请求失败则保持未解析、下次再试；期间切换学期会丢弃过期结果。
+- `intentGroups`：`splitPlaceholders` 把 `course === null` 的条目分到**占位条目**组（仅显示教学班代码、单独分组并附文字说明，PRD §3.2.8）。
+- `multiClassCourses`：`multiClassCourseCodes` 找出被打标了 ≥2 个教学班的课程代码；列表顶部提示 + 条目「多教学班」标签（PRD §3.2.6）。
+- `removeIntent(classCode)`：直接移除意向（无确认框），同步删除 IndexedDB 记录。
+
+> 纯函数集中在 `core/marks.ts`（`INTENT_LIMIT` / `isIntent` / `intentCodes` / `toggleIntent` / `sortByAddedAt` / `splitPlaceholders` / `multiClassCourseCodes`），由 `src/core/marks.spec.ts` 覆盖。
 
 ### 4.4 本地存储（IndexedDB）
 
