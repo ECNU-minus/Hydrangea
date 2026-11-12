@@ -6,6 +6,7 @@ import SemesterSelect from './components/search/SemesterSelect.vue'
 import SearchBar from './components/search/SearchBar.vue'
 import ClassList, { LAYOUT_META } from './components/search/ClassList.vue'
 import { useIsDesktop } from './composables/useMediaQuery'
+import { useMarkStore } from './stores/markStore'
 import { useSearchStore } from './stores/searchStore'
 import { useUiStore } from './stores/uiStore'
 
@@ -19,6 +20,9 @@ const uiStore = useUiStore()
  * （PRD §3.6.5）。学期只在组装查询参数时传入。
  */
 const searchStore = useSearchStore()
+
+/** 意向标记（DESIGN.md §4.3 markStore，本地 IndexedDB 持久化） */
+const markStore = useMarkStore()
 
 /** 布局随视口自适应：桌面端宽表格，移动端卡片（DESIGN.md §4.5） */
 const isDesktop = useIsDesktop()
@@ -88,10 +92,13 @@ function onApply() {
  *
  * 全局条件只有一份、不随学期变化；这里只更换「该学期的可用选项」，再由 store 派生
  * 出该学期生效的条件（该学期不存在条件自动暂不生效，切回时恢复），最后查询。
+ * 标记同样**按学期隔离**，故一并读取该学期的意向标记。
  */
 async function activateSemester(semester: string) {
+  markStore.clearNotice()
   await loadFilterOptions(semester)
   searchStore.enterSemester(semester, filterOptions.value)
+  await markStore.load(semester)
   refresh()
 }
 
@@ -139,12 +146,20 @@ onMounted(async () => {
       </aside>
 
       <main class="main">
+        <p v-if="markStore.limitNotice || markStore.error" class="intent-notice">
+          {{ markStore.limitNotice || markStore.error }}
+        </p>
         <p v-if="!uiStore.currentSemester" class="hint">学期信息不可用，请稍后重试</p>
         <p v-else-if="loading && items.length === 0" class="hint">加载中…</p>
         <p v-else-if="error" class="hint error">{{ error }}</p>
         <p v-else-if="items.length === 0" class="hint">暂无搜索结果</p>
         <div v-else class="list-wrap" :class="{ 'is-loading': loading }">
-          <ClassList :items="items" :layout="layout" />
+          <ClassList
+            :items="items"
+            :layout="layout"
+            :intent-codes="markStore.intents"
+            @toggle-intent="markStore.toggleIntentOf"
+          />
         </div>
       </main>
     </div>
@@ -239,6 +254,17 @@ onMounted(async () => {
 
 .hint.error {
   color: #d33;
+}
+
+/* 标记相关的提示（上限 / 本地存储不可用）：与副栏的筛选项提示同为琥珀色 */
+.intent-notice {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(180, 120, 0, 0.35);
+  background: rgba(255, 193, 7, 0.12);
+  color: #8a5a00;
+  font-size: 0.9em;
 }
 
 @media (max-width: 768px) {

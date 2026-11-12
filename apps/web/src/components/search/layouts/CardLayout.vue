@@ -2,19 +2,47 @@
 import type { ClassItem } from '../../../api/classes'
 import { formatSchedule, formatWeeks } from '../../../core/format'
 
-defineProps<{
+const props = defineProps<{
   items: ClassItem[]
+  /** 已打意向标记的教学班代码 */
+  intentCodes: string[]
 }>()
+
+const emit = defineEmits<{
+  /** 切换某教学班的意向标记 */
+  toggleIntent: [classCode: string]
+}>()
+
+/** 某教学班是否已打意向标记 */
+function isIntent(classCode: string): boolean {
+  return props.intentCodes.includes(classCode)
+}
 </script>
 
 <template>
   <div class="class-list">
-    <article v-for="item in items" :key="item.classCode" class="class-card">
+    <article
+      v-for="item in items"
+      :key="item.classCode"
+      class="class-card"
+      :class="{ 'is-intent': isIntent(item.classCode) }"
+    >
       <header class="card-header">
         <span class="class-code">{{ item.classCode }}</span>
         <span class="course-name">{{ item.courseName }}</span>
         <span class="course-code">{{ item.courseCode }}</span>
         <span class="hours-credits">{{ item.totalHours }}/{{ item.credits }}</span>
+        <button
+          type="button"
+          class="intent-toggle"
+          :class="{ 'is-on': isIntent(item.classCode) }"
+          :aria-pressed="isIntent(item.classCode)"
+          :aria-label="isIntent(item.classCode) ? '取消意向' : '标记意向'"
+          :title="isIntent(item.classCode) ? '取消意向' : '标记意向'"
+          @click="emit('toggleIntent', item.classCode)"
+        >
+          {{ isIntent(item.classCode) ? '★' : '☆' }}
+        </button>
       </header>
 
       <dl class="card-body">
@@ -100,6 +128,30 @@ defineProps<{
   font-family: var(--mono);
   color: var(--text);
   font-size: 0.9em;
+}
+
+/* 已打意向标记的卡片：左侧色条 + 浅底色（PRD §3.2.4） */
+.class-card.is-intent {
+  border-color: var(--accent);
+  background: var(--accent-bg, rgba(170, 59, 255, 0.06));
+}
+
+.intent-toggle {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 1.15em;
+  line-height: 1;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.intent-toggle:hover {
+  color: var(--accent);
+}
+
+.intent-toggle.is-on {
+  color: var(--accent);
 }
 
 .card-body {

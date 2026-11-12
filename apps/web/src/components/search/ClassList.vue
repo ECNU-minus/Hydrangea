@@ -25,11 +25,28 @@ defineProps<{
   items: ClassItem[]
   /** 当前布局（默认卡片） */
   layout?: ClassListLayout
+  /** 已打意向标记的教学班代码 */
+  intentCodes: string[]
+}>()
+
+const emit = defineEmits<{
+  /** 切换某教学班的意向标记 */
+  toggleIntent: [classCode: string]
 }>()
 </script>
 
 <template>
-  <CardLayout v-if="layout === 'card'" :items="items" />
-  <WideTableLayout v-else-if="layout === 'wide-table'" :items="items" />
-  <!-- 新增布局在此注册：<XxxLayout v-else-if="layout === 'xxx'" :items="items" /> -->
+  <CardLayout
+    v-if="layout === 'card'"
+    :items="items"
+    :intent-codes="intentCodes"
+    @toggle-intent="emit('toggleIntent', $event)"
+  />
+  <WideTableLayout
+    v-else-if="layout === 'wide-table'"
+    :items="items"
+    :intent-codes="intentCodes"
+    @toggle-intent="emit('toggleIntent', $event)"
+  />
+  <!-- 新增布局在此注册：<XxxLayout v-else-if="layout === 'xxx'" :items="items" :intent-codes="intentCodes" /> -->
 </template>

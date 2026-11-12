@@ -2,9 +2,21 @@
 import type { ClassItem } from '../../../api/classes'
 import { formatSchedule, formatWeeks } from '../../../core/format'
 
-defineProps<{
+const props = defineProps<{
   items: ClassItem[]
+  /** 已打意向标记的教学班代码 */
+  intentCodes: string[]
 }>()
+
+const emit = defineEmits<{
+  /** 切换某教学班的意向标记 */
+  toggleIntent: [classCode: string]
+}>()
+
+/** 某教学班是否已打意向标记 */
+function isIntent(classCode: string): boolean {
+  return props.intentCodes.includes(classCode)
+}
 </script>
 
 <template>
@@ -12,6 +24,7 @@ defineProps<{
     <table class="class-table">
       <thead>
         <tr>
+          <th class="intent-col">意向</th>
           <th>教学班</th>
           <th>课程代码</th>
           <th>课程名称</th>
@@ -26,7 +39,20 @@ defineProps<{
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in items" :key="item.classCode">
+        <tr v-for="item in items" :key="item.classCode" :class="{ 'is-intent': isIntent(item.classCode) }">
+          <td class="intent-cell">
+            <button
+              type="button"
+              class="intent-toggle"
+              :class="{ 'is-on': isIntent(item.classCode) }"
+              :aria-pressed="isIntent(item.classCode)"
+              :aria-label="isIntent(item.classCode) ? '取消意向' : '标记意向'"
+              :title="isIntent(item.classCode) ? '取消意向' : '标记意向'"
+              @click="emit('toggleIntent', item.classCode)"
+            >
+              {{ isIntent(item.classCode) ? '★' : '☆' }}
+            </button>
+          </td>
           <td class="class-code">{{ item.classCode }}</td>
           <td class="mono">{{ item.courseCode }}</td>
           <td class="course-name">{{ item.courseName }}</td>
@@ -80,12 +106,42 @@ defineProps<{
   background: var(--accent-bg, rgba(170, 59, 255, 0.05));
 }
 
+/* 已打意向标记的行：浅底色区分（PRD §3.2.4） */
+.class-table tbody tr.is-intent {
+  background: var(--accent-bg, rgba(170, 59, 255, 0.08));
+}
+
+.intent-col,
+.intent-cell {
+  width: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.intent-toggle {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 1.15em;
+  line-height: 1;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.intent-toggle:hover {
+  color: var(--accent);
+}
+
+.intent-toggle.is-on {
+  color: var(--accent);
+}
+
 /* 需要单行显示的列：教学班、课程代码、课程名称、学时/学分、教师、层次 */
 .class-table .class-code,
 .class-table .course-name,
 .class-table .mono,
-.class-table td:nth-child(5),
-.class-table td:nth-child(8) {
+.class-table td:nth-child(6),
+.class-table td:nth-child(9) {
   white-space: nowrap;
 }
 
