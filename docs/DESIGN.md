@@ -18,10 +18,11 @@
 | v1.11 | 2026-11-10 | Niazye | §4.3 简化为**全局一份条件**：`saved` 为唯一来源，`selections = clipSelections(saved, available)` 为当前学期生效部分，切换学期只换 `available`；`applyVisibleSelections` 取代 `mergeSelections`（勾选/取消都改这一份，当前学期用不到的值原样保留）；持久化键升为 `hydrangea.searchConditions.v2` |
 | v1.12 | 2026-11-12 | Niazye | 新增 IndexedDB 基座与**意向标记**：§2.6 明确 `marks` 独立 store 过渡模型（键 `[semester, classCode]`，字段含 `intent`/`scheduled`/`addedAt`）；§4.3 新增 `markStore` 职责、上限与降级规则；§4.4 写明数据库 `hydrangea` v1 的 `marks`/`settings` 结构（`plans` 随方案切片以 v2 加入）；§4.5 布局组件新增 `intentCodes` prop 与 `toggleIntent` 事件 |
 | v1.13 | 2026-11-12 | Niazye | 新增**路由与排课页骨架**：§3.5 落地 `GET /api/classes/:classCode?semester=`（200/400/404）供意向列表回查课程信息；§4.1 路由表标注现状并说明壳层/学期下拉职责；§4.2 组件树补 `views/`、`router/`、`layout/SemesterBar.vue`、`schedule/IntentList.vue`；§4.3 补 `markStore` 的详情回查、占位条目分组、多教学班提示与移除意向 |
+| v1.14 | 2026-11-13 | Niazye | 新增**已排标记与周课表**：§4.3 补 `markStore` 的已排职责（`scheduledSessions`、`toggleScheduledOf`、占位条目级联清除已排、存储边界浅拷贝）；§4.2 组件树补 `schedule/TimetableGrid.vue`；§7.1–§7.3 标注已实现并写清 `core/conflict.ts`、`core/timetable.ts`、`core/weeks.ts`、`core/slots.ts` 的分工；§4.1 排课页状态更新为已实现（方案管理待做） |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
-| 文档版本 | v1.13 |
+| 文档版本 | v1.14 |
 | 编写日期 | 2026-09-23 |
 | 文档状态 | 完整版，待评审 |
 | 目标读者 | 前后端开发、测试、运维 |
@@ -345,7 +346,7 @@ flowchart LR
 | 路由 | 页面 | 职责 | 现状 |
 | --- | --- | --- | --- |
 | `/search` | 搜索页（`views/SearchPage.vue`） | 查询、筛选、打意向标记 | 已实现 |
-| `/schedule` | 排课页（`views/SchedulePage.vue`） | 查看课表、打已排标记、方案管理 | 部分实现（副栏意向列表；课表与已排待做） |
+| `/schedule` | 排课页（`views/SchedulePage.vue`） | 查看课表、打已排标记、方案管理 | 已实现（意向列表 + 已排 + 周课表；方案管理待做） |
 
 > `/` 重定向到 `/search`；未知路径同样回到 `/search`。页面外壳（页头 + 页签 + `RouterView`）在 `App.vue`，学期列表在壳里加载一次，副栏学期下拉由 `components/layout/SemesterBar.vue` 提供（两页共用，切换后各自响应并重新加载该学期的标记）。
 
@@ -372,16 +373,16 @@ src/
 ├── storage/                 # IndexedDB 封装
 ├── api/                     # 后端 API 客户端
 ├── components/
-│   ├── layout/              # 布局（副栏、汉堡按钮、学期切换）
+│   ├── layout/              # 布局（副栏、汉堡按钮）：SemesterBar.vue（副栏学期选择）
 │   ├── search/              # 搜索页组件
 │   │   ├── SearchBar.vue    # 搜索栏（关键词 + 四项复选筛选 + 分页）
 │   │   ├── ClassList.vue    # 搜索结果布局门面（按 layout 分发）
 │   │   └── layouts/         # 各布局组件，互不依赖
 │   │       ├── CardLayout.vue      # 卡片布局（移动端）
 │   │       └── WideTableLayout.vue # 宽表格布局（桌面端）
-│   ├── layout/              # 页面骨架：SemesterBar.vue（副栏学期选择）
 │   ├── schedule/            # 排课页组件
-│   │   └── IntentList.vue   # 副栏意向列表（占位条目、多教学班提示、移除意向）
+│   │   ├── IntentList.vue   # 副栏意向列表（占位条目、多教学班提示、已排开关、移除意向）
+│   │   └── TimetableGrid.vue # 主栏周课表（周次圆点、冲突标红）
 │   ├── export/              # 导出组件
 │   ├── import/              # 导入组件
 │   └── common/              # 通用组件
@@ -452,6 +453,16 @@ src/
 - `removeIntent(classCode)`：直接移除意向（无确认框），同步删除 IndexedDB 记录。
 
 > 纯函数集中在 `core/marks.ts`（`INTENT_LIMIT` / `isIntent` / `intentCodes` / `toggleIntent` / `sortByAddedAt` / `splitPlaceholders` / `multiClassCourseCodes`），由 `src/core/marks.spec.ts` 覆盖。
+
+**已排标记与课表（PRD §3.3）**：
+
+- `scheduledCodes` / `scheduledSessions`：已排教学班及其课程详情（`schedule` + `weeks`），供课表与冲突检测使用；占位条目没有上课时间，**不进入课表**。
+- `toggleScheduledOf(classCode)`：调 `core/marks.ts#toggleScheduled`，**只有已打意向的才能打已排**；占位条目直接拒绝并提示。冲突允许排入（PRD §3.3.2）。
+- `resolveDetails()` 结束后调 `pruneMissingScheduled()`：数据中已不存在的教学班**级联清除已排标记**并落库（PRD §3.5）。
+- 排课页把 `scheduledSessions` 交给 `core/conflict.ts#detectConflicts` 与 `core/timetable.ts#buildTimetable` 生成课表；「按周查看」时只渲染该周有课的课程块，冲突提示也只提示该周的冲突。
+- 存储边界（`storage/db.ts`）在写入前把响应式代理浅拷贝为普通对象，避免 IndexedDB 结构化克隆失败。
+
+> 课表相关纯函数：`core/slots.ts`（14 节次与时间）、`core/weeks.ts`（周次交集/并集）、`core/conflict.ts`（冲突检测）、`core/timetable.ts`（网格与周次圆点），分别由同名 `*.spec.ts` 覆盖。
 
 ### 4.4 本地存储（IndexedDB）
 
@@ -571,17 +582,25 @@ function isConflict(a: Schedule[], b: Schedule[]): boolean {
 
 > 冲突**允许排入**，不做阻止（PRD §3.3.2）。多冲突统一按冲突样式表现。
 
+**实现**（`core/conflict.ts`）：`detectConflicts(sessions)` 遍历教学班两两组合，返回
+`{ classCodes, cellWeeks, pairs }`——有冲突的教学班集合、`classCode|day|slot → 冲突周次`（用于把对应圆点画成方形）、冲突对（用于提示文案）。
+节次交集按 `[max(start), min(end)]` 逐节登记；周次交集由 `core/weeks.ts#intersectWeeks` 给出。
+
 ### 7.2 课表生成
 
 - 根据已排教学班生成一周课表（周一至周日 × 14 节次）。
 - 每个教学班按 `schedule` 各段填充对应单元格。
 - 冲突单元格以**方形圆点 + 文本标红**表现（PRD §3.3.2）。
 
+**实现**（`core/timetable.ts`）：`buildTimetable(sessions, conflicts, week?)` 产出 `{ days, slots, starts, covered, weeks }`——`starts[day][slot]` 是**从该节次开始**的课程块（含 `span`，模板用 `rowspan` 跨过被覆盖的节次），`covered` 记录被跨过的格子；`weeks` 为该学期涉及周次（按数据推导，不硬编码）。`weekDots(block, allWeeks)` 给出每个圆点的 `on / off / conflict` 状态。
+
 ### 7.3 周次处理
 
 - 周次为数组，支持不连续、单/双周（PRD §3.6.2）。
 - 课表单元格内用圆点表示周次：有课填充、无课描线、冲突方形（PRD §3.3.3）。
 - 提供按周查看功能。
+
+**实现**：`core/weeks.ts` 提供 `hasWeekOverlap` / `intersectWeeks` / `allWeeksOf`；排课页的「查看」下拉列出 `timetable.weeks`（全部周次 / 第 N 周），选周后只渲染该周有课的课程块。
 
 ---
 
