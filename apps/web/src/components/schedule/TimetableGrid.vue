@@ -19,6 +19,10 @@ function rowSpanOf(day: number, slot: number): number {
 <template>
   <div class="timetable-wrap">
     <table class="timetable">
+      <colgroup>
+        <col class="col-slot" />
+        <col v-for="day in grid.days" :key="day" />
+      </colgroup>
       <thead>
         <tr>
           <th class="slot-head">节次</th>
@@ -27,10 +31,9 @@ function rowSpanOf(day: number, slot: number): number {
       </thead>
       <tbody>
         <tr v-for="slot in grid.slots" :key="slot.index">
-          <th class="slot-col">
+          <th class="slot-col" :title="`第${slot.index}节 ${slot.start}–${slot.end}`">
             <span class="slot-col__index">第{{ slot.index }}节</span>
-            <span class="slot-col__time">{{ slot.start }}</span>
-            <span class="slot-col__time">{{ slot.end }}</span>
+            <span class="slot-col__time">{{ slot.start }}–{{ slot.end }}</span>
           </th>
           <template v-for="day in grid.days" :key="day">
             <td
@@ -95,24 +98,28 @@ function rowSpanOf(day: number, slot: number): number {
   padding: 6px 4px;
 }
 
+/* 节次列宽由 colgroup 指定（固定表格布局下由首行决定列宽） */
+.col-slot {
+  width: 120px;
+}
+
+/* 节次列：节次与时间同一行，永不换行 */
 .slot-col {
-  width: 62px;
   text-align: center;
   font-weight: 400;
   white-space: nowrap;
 }
 
 .slot-col__index {
-  display: block;
-  font-size: 0.75em;
+  font-size: 0.72em;
   color: var(--text-h);
 }
 
 .slot-col__time {
-  display: block;
   font-family: var(--mono);
-  font-size: 0.65em;
+  font-size: 0.62em;
   color: var(--text);
+  margin-left: 4px;
 }
 
 .cell {
