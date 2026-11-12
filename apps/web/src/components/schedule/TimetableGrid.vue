@@ -34,8 +34,7 @@ function rowSpanOf(day: number, slot: number): number {
           <th class="slot-col" :title="`第${slot.index}节 ${slot.start}–${slot.end}`">
             <span class="slot-col__index">第{{ slot.index }}节</span>
             <span class="slot-col__time">{{ slot.start }}–{{ slot.end }}</span>
-          </th>
-          <template v-for="day in grid.days" :key="day">
+          </th>          <template v-for="day in grid.days" :key="day">
             <td
               v-if="!isCovered(grid, day, slot.index)"
               :rowspan="rowSpanOf(day, slot.index)"
@@ -100,26 +99,29 @@ function rowSpanOf(day: number, slot: number): number {
 
 /* 节次列宽由 colgroup 指定（固定表格布局下由首行决定列宽） */
 .col-slot {
-  width: 120px;
+  width: 76px;
 }
 
-/* 节次列：节次与时间同一行，永不换行 */
+/* 节次列：节次一行、时间一行；两行各自都不折行 */
 .slot-col {
   text-align: center;
   font-weight: 400;
   white-space: nowrap;
+  line-height: 1.25;
 }
 
 .slot-col__index {
+  display: block;
   font-size: 0.72em;
   color: var(--text-h);
 }
 
 .slot-col__time {
+  display: block;
   font-family: var(--mono);
   font-size: 0.62em;
   color: var(--text);
-  margin-left: 4px;
+  white-space: nowrap;
 }
 
 .cell {
