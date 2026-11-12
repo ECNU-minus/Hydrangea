@@ -61,7 +61,7 @@ export interface QueryClassesResult {
   items: ClassItem[];
 }
 
-/** 查询教学班（GET /api/classes） */
+/** 查询教学班（GET /api/classes） *//** 查询教学班（GET /api/classes） */
 export async function queryClasses(
   params: QueryClassesParams,
 ): Promise<QueryClassesResult> {
@@ -83,4 +83,23 @@ export async function queryClasses(
     throw new Error(`查询课程失败：HTTP ${res.status}`);
   }
   return (await res.json()) as QueryClassesResult;
+}
+
+/**
+ * 查询单个教学班（GET /api/classes/:classCode?semester=，DESIGN §3.5）
+ *
+ * 教学班代码跨学期重复，故必须带学期。该学期查不到时后端返回 404，
+ * 这里转成 `null`——意向列表据此渲染占位条目（PRD §3.2.8）。
+ */
+export async function queryClass(semester: string, classCode: string): Promise<ClassItem | null> {
+  const url = new URL(`/api/classes/${encodeURIComponent(classCode)}`, window.location.origin);
+  url.searchParams.set('semester', semester);
+
+  const res = await fetch(url.toString());
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`获取教学班失败：HTTP ${res.status}`);
+  }
+
+  return (await res.json()) as ClassItem;
 }

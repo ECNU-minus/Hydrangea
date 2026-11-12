@@ -13,6 +13,14 @@ export interface Schedule {
   location: string;
 }
 
+/** 将时间戳格式化为 "MM-DD HH:mm"（意向列表等展示用） */
+export function formatDateTime(timestamp: number): string {
+  const date = new Date(timestamp)
+  const pad = (n: number) => String(n).padStart(2, '0')
+
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 /** 将周次数组格式化为可读文本，如 "1-16"、"1,3,5,7" */
 export function formatWeeks(weeks: number[]): string {
   if (weeks.length === 0) return ''

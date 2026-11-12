@@ -56,3 +56,56 @@ export function toggleIntent(
     blocked: false,
   }
 }
+
+/** 意向列表中的一条（详情可为空：未解析或数据中已不存在） */
+export interface IntentEntry {
+  classCode: string
+  addedAt: number
+  /** 教学班详情：`undefined` = 未解析，`null` = 数据中不存在（占位条目） */
+  course?: { courseCode: string; courseName: string } | null
+}
+
+/** 按添加时间升序（先加的在上，PRD §3.2.8）；不修改入参 */
+export function sortByAddedAt(marks: readonly IntentMark[]): IntentMark[] {
+  return [...marks].sort((a, b) => a.addedAt - b.addedAt)
+}
+
+/**
+ * 拆出占位条目（PRD §3.2.8）
+ *
+ * `course === null` 表示数据中不存在该教学班 → 占位条目，仅展示教学班代码，
+ * 与正常课程在列表中分隔展示。`undefined`（尚未回查）不算占位，避免闪烁。
+ */
+export function splitPlaceholders(entries: readonly IntentEntry[]): {
+  normal: IntentEntry[]
+  placeholders: IntentEntry[]
+} {
+  const normal: IntentEntry[] = []
+  const placeholders: IntentEntry[] = []
+
+  for (const entry of entries) {
+    if (entry.course === null) placeholders.push(entry)
+    else normal.push(entry)
+  }
+
+  return { normal, placeholders }
+}
+
+/**
+ * 同一课程被打标了多个教学班的课程代码（PRD §3.2.6）
+ *
+ * 仅统计已解析出详情的条目；返回出现次数 ≥ 2 的课程代码。
+ */
+export function multiClassCourseCodes(entries: readonly IntentEntry[]): string[] {
+  const counts = new Map<string, number>()
+
+  for (const entry of entries) {
+    if (!entry.course) continue
+    counts.set(entry.course.courseCode, (counts.get(entry.course.courseCode) ?? 0) + 1)
+  }
+
+  return [...counts.entries()]
+    .filter(([, count]) => count >= 2)
+    .map(([courseCode]) => courseCode)
+    .sort((a, b) => a.localeCompare(b))
+}

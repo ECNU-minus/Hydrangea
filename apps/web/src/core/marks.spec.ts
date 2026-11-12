@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { INTENT_LIMIT, intentCodes, isIntent, toggleIntent } from './marks'
+import {
+  INTENT_LIMIT,
+  intentCodes,
+  isIntent,
+  multiClassCourseCodes,
+  sortByAddedAt,
+  splitPlaceholders,
+  toggleIntent,
+  type IntentEntry,
+} from './marks'
 import type { IntentMark } from '../storage/db'
 
 const SEMESTER = '2026-2027-1'
@@ -96,5 +105,72 @@ describe('toggleIntent（上限）', () => {
 
     expect(blocked).toBe(false)
     expect(next).toHaveLength(INTENT_LIMIT - 1)
+  })
+})
+
+describe('sortByAddedAt', () => {
+  it('按打标时间升序排列', () => {
+    const list = [mark('B', 30), mark('A', 10), mark('C', 20)]
+
+    expect(sortByAddedAt(list).map((m) => m.classCode)).toEqual(['A', 'C', 'B'])
+  })
+
+  it('不修改入参', () => {
+    const list = [mark('B', 30), mark('A', 10)]
+    sortByAddedAt(list)
+
+    expect(list.map((m) => m.classCode)).toEqual(['B', 'A'])
+  })
+})
+
+describe('splitPlaceholders', () => {
+  const entry = (
+    classCode: string,
+    course: IntentEntry['course'],
+    addedAt = 1,
+  ): IntentEntry => ({ classCode, addedAt, course })
+
+  it('detail 为 null 的条目归入占位条目', () => {
+    const { normal, placeholders } = splitPlaceholders([
+      entry('A001', { courseCode: 'CS101', courseName: '数据结构' }),
+      entry('GONE01', null),
+    ])
+
+    expect(normal.map((e) => e.classCode)).toEqual(['A001'])
+    expect(placeholders.map((e) => e.classCode)).toEqual(['GONE01'])
+  })
+
+  it('尚未回查（undefined）不算占位，避免加载时闪烁', () => {
+    const { normal, placeholders } = splitPlaceholders([entry('A001', undefined)])
+
+    expect(normal).toHaveLength(1)
+    expect(placeholders).toHaveLength(0)
+  })
+})
+
+describe('multiClassCourseCodes', () => {
+  const entry = (classCode: string, courseCode: string): IntentEntry => ({
+    classCode,
+    addedAt: 1,
+    course: { courseCode, courseName: `课程 ${courseCode}` },
+  })
+
+  it('同一课程标了两个教学班时返回其课程代码', () => {
+    expect(
+      multiClassCourseCodes([entry('A001', 'CS101'), entry('A002', 'CS101'), entry('B001', 'MA201')]),
+    ).toEqual(['CS101'])
+  })
+
+  it('每个课程只有一个教学班时为空', () => {
+    expect(multiClassCourseCodes([entry('A001', 'CS101'), entry('B001', 'MA201')])).toEqual([])
+  })
+
+  it('忽略尚未解析或已不存在的条目', () => {
+    expect(
+      multiClassCourseCodes([
+        { classCode: 'A001', addedAt: 1 },
+        { classCode: 'A002', addedAt: 2, course: null },
+      ]),
+    ).toEqual([])
   })
 })
