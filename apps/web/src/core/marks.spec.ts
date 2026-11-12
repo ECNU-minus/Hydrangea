@@ -14,9 +14,11 @@ import {
 import type { IntentMark } from '../storage/db'
 
 const SEMESTER = '2026-2027-1'
+const PLAN = 'plan-1'
 
 /** 构造一条意向标记 */
 const mark = (classCode: string, addedAt = 1): IntentMark => ({
+  planId: PLAN,
   semester: SEMESTER,
   classCode,
   intent: true,
@@ -43,11 +45,12 @@ describe('isIntent / intentCodes', () => {
 
 describe('toggleIntent（添加）', () => {
   it('未打标时追加一条意向标记，并记录打标时间', () => {
-    const { next, blocked } = toggleIntent([], SEMESTER, 'A001', 1700000000000)
+    const { next, blocked } = toggleIntent([], PLAN, SEMESTER, 'A001', 1700000000000)
 
     expect(blocked).toBe(false)
     expect(next).toEqual([
       {
+        planId: PLAN,
         semester: SEMESTER,
         classCode: 'A001',
         intent: true,
@@ -59,14 +62,14 @@ describe('toggleIntent（添加）', () => {
 
   it('保留已存在的其它标记与顺序', () => {
     const existing = [mark('A002', 2), mark('A001', 1)]
-    const { next } = toggleIntent(existing, SEMESTER, 'A003', 3)
+    const { next } = toggleIntent(existing, PLAN, SEMESTER, 'A003', 3)
 
     expect(intentCodes(next)).toEqual(['A002', 'A001', 'A003'])
   })
 
   it('不修改入参', () => {
     const existing = [mark('A001', 1)]
-    toggleIntent(existing, SEMESTER, 'A002', 2)
+    toggleIntent(existing, PLAN, SEMESTER, 'A002', 2)
 
     expect(intentCodes(existing)).toEqual(['A001'])
   })
@@ -75,7 +78,7 @@ describe('toggleIntent（添加）', () => {
 describe('toggleIntent（取消）', () => {
   it('已打标时移除该条', () => {
     const existing = [mark('A001', 1), mark('A002', 2)]
-    const { next, blocked } = toggleIntent(existing, SEMESTER, 'A001', 3)
+    const { next, blocked } = toggleIntent(existing, PLAN, SEMESTER, 'A001', 3)
 
     expect(blocked).toBe(false)
     expect(intentCodes(next)).toEqual(['A002'])
@@ -83,8 +86,8 @@ describe('toggleIntent（取消）', () => {
 
   it('取消后仍可再次添加（回到列表末尾）', () => {
     const existing = [mark('A001', 1), mark('A002', 2)]
-    const removed = toggleIntent(existing, SEMESTER, 'A001', 3).next
-    const reAdded = toggleIntent(removed, SEMESTER, 'A001', 4).next
+    const removed = toggleIntent(existing, PLAN, SEMESTER, 'A001', 3).next
+    const reAdded = toggleIntent(removed, PLAN, SEMESTER, 'A001', 4).next
 
     expect(intentCodes(reAdded)).toEqual(['A002', 'A001'])
     expect(reAdded.at(-1)?.addedAt).toBe(4)
@@ -94,7 +97,7 @@ describe('toggleIntent（取消）', () => {
 describe('toggleIntent（上限）', () => {
   it('达到上限后再添加被阻止，列表不变', () => {
     const existing = marks(INTENT_LIMIT)
-    const { next, blocked } = toggleIntent(existing, SEMESTER, 'NEW', 999)
+    const { next, blocked } = toggleIntent(existing, PLAN, SEMESTER, 'NEW', 999)
 
     expect(blocked).toBe(true)
     expect(next).toHaveLength(INTENT_LIMIT)
@@ -103,7 +106,7 @@ describe('toggleIntent（上限）', () => {
 
   it('达到上限时仍可取消已有标记', () => {
     const existing = marks(INTENT_LIMIT)
-    const { next, blocked } = toggleIntent(existing, SEMESTER, 'C000', 999)
+    const { next, blocked } = toggleIntent(existing, PLAN, SEMESTER, 'C000', 999)
 
     expect(blocked).toBe(false)
     expect(next).toHaveLength(INTENT_LIMIT - 1)

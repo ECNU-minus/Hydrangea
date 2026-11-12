@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import TimetableGrid from '../components/schedule/TimetableGrid.vue'
 import IntentList from '../components/schedule/IntentList.vue'
+import PlanBar from '../components/schedule/PlanBar.vue'
 import SemesterBar from '../components/layout/SemesterBar.vue'
 import { detectConflicts } from '../core/conflict'
 import { buildTimetable } from '../core/timetable'
@@ -45,6 +46,7 @@ const conflictText = computed(() =>
   <div class="schedule-page">
     <aside class="sidebar">
       <SemesterBar />
+      <PlanBar />
       <IntentList />
     </aside>
 

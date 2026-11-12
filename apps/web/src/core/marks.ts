@@ -35,10 +35,11 @@ export function intentCodes(marks: readonly IntentMark[]): string[] {
  *
  * - 已存在：移除该条（取消意向）。
  * - 不存在且已达上限：`blocked = true`，列表不变。
- * - 不存在且未达上限：追加一条 `{ intent: true, scheduled: false }`。
+ * - 不存在且未达上限：追加一条 `{ intent: true, scheduled: false }`（归属当前方案，PRD §3.5）。
  */
 export function toggleIntent(
   marks: readonly IntentMark[],
+  planId: string,
   semester: string,
   classCode: string,
   now: number,
@@ -52,7 +53,7 @@ export function toggleIntent(
   }
 
   return {
-    next: [...marks, { semester, classCode, intent: true, scheduled: false, addedAt: now }],
+    next: [...marks, { planId, semester, classCode, intent: true, scheduled: false, addedAt: now }],
     blocked: false,
   }
 }

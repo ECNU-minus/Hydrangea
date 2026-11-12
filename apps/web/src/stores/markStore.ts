@@ -14,7 +14,7 @@ import {
   type IntentEntry,
   type ToggleResult,
 } from '../core/marks'
-import { addMark, deleteMark, listMarks, type IntentMark } from '../storage/db'
+import { deleteMark, listMarks, putMark, type IntentMark } from '../storage/db'
 
 /**
  * 标记状态（DESIGN §4.3 markStore）
@@ -26,7 +26,9 @@ import { addMark, deleteMark, listMarks, type IntentMark } from '../storage/db'
 export const useMarkStore = defineStore('marks', () => {
   /** 标记所属学期 */
   const semester = ref('')
-  /** 当前学期的标记列表（按打标时间升序） */
+  /** 标记所属方案（PRD §3.5：标记归属方案） */
+  const planId = ref('')
+  /** 当前方案的标记列表（按打标时间升序） */
   const marks = ref<IntentMark[]>([])
   /** 教学班详情缓存：`undefined` = 未解析，`null` = 数据中不存在（占位条目） */
   const details = ref<Record<string, ClassItem | null>>({})
@@ -105,14 +107,15 @@ export const useMarkStore = defineStore('marks', () => {
     return intents.value.includes(classCode)
   }
 
-  /** 读取某学期的标记；读取失败只提示，不阻塞查询 */
-  async function load(target: string): Promise<void> {
+  /** 读取某方案（含学期）的标记；读取失败只提示，不阻塞查询 */
+  async function load(target: string, plan: string): Promise<void> {
     semester.value = target
+    planId.value = plan
     details.value = {}
     loading.value = true
     error.value = ''
     try {
-      marks.value = await listMarks(target)
+      marks.value = plan ? await listMarks(plan) : []
     } catch (e) {
       error.value = e instanceof Error ? e.message : '本地标记读取失败'
       marks.value = []
@@ -173,7 +176,7 @@ export const useMarkStore = defineStore('marks', () => {
     for (const mark of next) {
       if (!stale.some((item) => item.classCode === mark.classCode)) continue
       try {
-        await addMark(mark)
+        await putMark(mark)
       } catch (e) {
         error.value = e instanceof Error ? e.message : '本地标记保存失败'
       }
@@ -186,9 +189,9 @@ export const useMarkStore = defineStore('marks', () => {
 
     try {
       if (current) {
-        await addMark(current)
+        await putMark(current)
       } else {
-        await deleteMark(semester.value, classCode)
+        await deleteMark(planId.value, classCode)
         delete details.value[classCode]
       }
       error.value = ''
@@ -199,7 +202,7 @@ export const useMarkStore = defineStore('marks', () => {
 
   /** 切换某教学班的意向标记（点击即生效，无确认框，PRD §3.2.4） */
   async function toggleIntentOf(classCode: string): Promise<void> {
-    const result = toggleIntent(marks.value, semester.value, classCode, Date.now())
+    const result = toggleIntent(marks.value, planId.value, semester.value, classCode, Date.now())
 
     if (result.blocked) {
       limitNotice.value = `意向最多 ${INTENT_LIMIT} 门课，已达上限，无法继续添加`
@@ -240,7 +243,7 @@ export const useMarkStore = defineStore('marks', () => {
 
     const current = result.next.find((mark) => mark.classCode === classCode)
     try {
-      if (current) await addMark(current)
+      if (current) await putMark(current)
       error.value = ''
     } catch (e) {
       error.value = e instanceof Error ? e.message : '本地标记保存失败'
@@ -254,6 +257,7 @@ export const useMarkStore = defineStore('marks', () => {
 
   return {
     semester,
+    planId,
     marks,
     details,
     loading,
