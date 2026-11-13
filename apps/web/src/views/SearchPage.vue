@@ -5,6 +5,7 @@ import { EMPTY_FILTER_OPTIONS, queryFilters, type FilterOptions } from '../api/f
 import ClassList, { LAYOUT_META } from '../components/search/ClassList.vue'
 import SearchBar from '../components/search/SearchBar.vue'
 import SemesterBar from '../components/layout/SemesterBar.vue'
+import SidebarDrawer from '../components/layout/SidebarDrawer.vue'
 import { useIsDesktop } from '../composables/useMediaQuery'
 import { useMarkStore } from '../stores/markStore'
 import { useSearchStore } from '../stores/searchStore'
@@ -113,7 +114,7 @@ watch(
 
 <template>
   <div class="search-page" :class="`search-page--${LAYOUT_META[layout].container}`">
-    <aside class="sidebar">
+    <SidebarDrawer class="search-sidebar">
       <SemesterBar />
       <SearchBar
         :total="total"
@@ -122,7 +123,7 @@ watch(
         :notice="shelvedNotice"
         @apply="onApply"
       />
-    </aside>
+    </SidebarDrawer>
 
     <main class="main">
       <p v-if="markStore.limitNotice || markStore.error" class="intent-notice">
@@ -167,20 +168,8 @@ watch(
   padding: 0 0 16px;
 }
 
-.search-page--wide .sidebar {
+.search-page--wide .search-sidebar {
   margin-left: 16px;
-}
-
-.sidebar {
-  position: sticky;
-  top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-  background: var(--bg);
 }
 
 .main {
@@ -226,10 +215,6 @@ watch(
 @media (max-width: 768px) {
   .search-page {
     grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: static;
   }
 }
 </style>

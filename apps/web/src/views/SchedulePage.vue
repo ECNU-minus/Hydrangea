@@ -4,6 +4,7 @@ import TimetableGrid from '../components/schedule/TimetableGrid.vue'
 import IntentList from '../components/schedule/IntentList.vue'
 import PlanBar from '../components/schedule/PlanBar.vue'
 import SemesterBar from '../components/layout/SemesterBar.vue'
+import SidebarDrawer from '../components/layout/SidebarDrawer.vue'
 import { detectConflicts } from '../core/conflict'
 import { buildTimetable } from '../core/timetable'
 import { useMarkStore } from '../stores/markStore'
@@ -44,11 +45,11 @@ const conflictText = computed(() =>
 
 <template>
   <div class="schedule-page">
-    <aside class="sidebar">
+    <SidebarDrawer class="schedule-sidebar" scrollable>
       <SemesterBar />
       <PlanBar />
       <IntentList />
-    </aside>
+    </SidebarDrawer>
 
     <main class="main">
       <p v-if="markStore.limitNotice || markStore.error" class="intent-notice">
@@ -93,20 +94,6 @@ const conflictText = computed(() =>
   align-items: start;
   width: 100%;
   padding: 16px;
-}
-
-.sidebar {
-  position: sticky;
-  top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-  background: var(--bg);
-  max-height: calc(100vh - 96px);
-  overflow-y: auto;
 }
 
 .main {
@@ -180,11 +167,6 @@ const conflictText = computed(() =>
 @media (max-width: 768px) {
   .schedule-page {
     grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: static;
-    max-height: none;
   }
 }
 </style>

@@ -24,7 +24,7 @@ function persistSemester(semester: string): void {
 /**
  * UI 状态（DESIGN §4.3）
  *
- * 负责当前学期与可用学期列表；课程查询结果与筛选项仍由页面自行维护。
+ * 负责当前学期与可用学期列表、窄屏副栏的展开状态；课程查询结果与筛选项仍由页面自行维护。
  */
 export const useUiStore = defineStore('ui', () => {
   /** 可用学期（最新在前，顺序由后端保证） */
@@ -33,6 +33,18 @@ export const useUiStore = defineStore('ui', () => {
   const currentSemester = ref('')
   const loading = ref(false)
   const error = ref('')
+  /** 窄屏副栏是否展开（桌面端常驻显示，此状态不参与） */
+  const sidebarOpen = ref(false)
+
+  /** 展开/收起窄屏副栏（PRD §3.6.1 汉堡按钮） */
+  function toggleSidebar(): void {
+    sidebarOpen.value = !sidebarOpen.value
+  }
+
+  /** 收起窄屏副栏（遮罩点击、Esc、路由切换时调用） */
+  function closeSidebar(): void {
+    sidebarOpen.value = false
+  }
 
   /**
    * 加载学期列表并确定当前学期
@@ -63,5 +75,15 @@ export const useUiStore = defineStore('ui', () => {
     persistSemester(semester)
   }
 
-  return { availableSemesters, currentSemester, loading, error, loadSemesters, setSemester }
+  return {
+    availableSemesters,
+    currentSemester,
+    loading,
+    error,
+    sidebarOpen,
+    loadSemesters,
+    setSemester,
+    toggleSidebar,
+    closeSidebar,
+  }
 })
