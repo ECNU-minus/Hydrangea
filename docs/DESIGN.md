@@ -20,6 +20,7 @@
 | v1.13 | 2026-11-12 | Niazye | 新增**路由与排课页骨架**：§3.5 落地 `GET /api/classes/:classCode?semester=`（200/400/404）供意向列表回查课程信息；§4.1 路由表标注现状并说明壳层/学期下拉职责；§4.2 组件树补 `views/`、`router/`、`layout/SemesterBar.vue`、`schedule/IntentList.vue`；§4.3 补 `markStore` 的详情回查、占位条目分组、多教学班提示与移除意向 |
 | v1.14 | 2026-11-13 | Niazye | 新增**已排标记与周课表**：§4.3 补 `markStore` 的已排职责（`scheduledSessions`、`toggleScheduledOf`、占位条目级联清除已排、存储边界浅拷贝）；§4.2 组件树补 `schedule/TimetableGrid.vue`；§7.1–§7.3 标注已实现并写清 `core/conflict.ts`、`core/timetable.ts`、`core/weeks.ts`、`core/slots.ts` 的分工；§4.1 排课页状态更新为已实现（方案管理待做） |
 | v1.15 | 2026-11-13 | Niazye | 新增**排课方案管理**：§2.6 方案与标记改为 `plans` + `planMarks` 两个 store（按 `planId` 关联），补 v1→v2 迁移说明；§4.2 组件树补 `schedule/PlanBar.vue`；§4.3 新增 `planStore` 职责与方案规则（≤10 个、默认名「方案 N」、每学期记住当前方案、删到最后一个自动新建），`markStore` 改为**方案作用域**；§4.4 写清数据库 v2 结构与三步迁移 |
+| v1.16 | 2026-11-13 | Niazye | 落实**窄屏副栏抽屉**（PRD §3.6.1）：§4.2 新增 `layout/SidebarDrawer.vue`（两页共用的副栏外壳：桌面端粘性面板 / 窄屏左侧抽屉 + 遮罩）；§4.1 写清汉堡按钮（`App.vue` 页头，仅窄屏显示）与收起方式（再次点击、点遮罩、Esc、切换页面、视口变宽）；§4.3 `uiStore` 补 `sidebarOpen` / `toggleSidebar` / `closeSidebar` |
 
 | 项目名称 | 课程查询与选课排课系统（Hydrangea） |
 | --- | --- |
@@ -355,7 +356,14 @@ flowchart LR
 
 > `/` 重定向到 `/search`；未知路径同样回到 `/search`。页面外壳（页头 + 页签 + `RouterView`）在 `App.vue`，学期列表在壳里加载一次，副栏学期下拉由 `components/layout/SemesterBar.vue` 提供（两页共用，切换后各自响应并重新加载该学期的标记）。
 
-**布局**：两页均左右分栏，左侧副栏（搜索/筛选/意向列表/方案管理/学期切换），右侧主栏（结果/课表）。窄屏用汉堡按钮展开/收起副栏。
+**布局**：两页均左右分栏，左侧副栏（搜索/筛选/意向列表/方案管理/学期切换），右侧主栏（结果/课表）。
+
+**窄屏副栏（PRD §3.6.1）**：
+
+- 页头（`App.vue`）在窄屏显示**汉堡按钮**（`☰` ↔ `✕`，带 `aria-expanded`）；页头为粘性（`z-index` 高于抽屉），保证按钮在抽屉展开时仍可点。
+- 副栏由 `layout/SidebarDrawer.vue` 渲染：桌面端是粘性面板，窄屏变成**左侧抽屉**（宽 `min(320px, 86vw)`，从左侧滑出）+ 半透明遮罩。
+- 收起方式：再次点汉堡按钮、点遮罩、按 Esc、切换页面、视口变宽回桌面端；展开时锁定背景滚动。
+- 桌面端断点沿用 `DESKTOP_MIN_WIDTH = 768`（`composables/useMediaQuery.ts`），与卡片/宽表格布局一致。
 
 ### 4.2 组件结构
 
@@ -378,7 +386,9 @@ src/
 ├── storage/                 # IndexedDB 封装
 ├── api/                     # 后端 API 客户端
 ├── components/
-│   ├── layout/              # 布局（副栏、汉堡按钮）：SemesterBar.vue（副栏学期选择）
+│   ├── layout/              # 布局（副栏、汉堡按钮）
+│   │   ├── SemesterBar.vue  # 副栏学期选择
+│   │   └── SidebarDrawer.vue # 副栏外壳：桌面粘性面板 / 窄屏左侧抽屉 + 遮罩
 │   ├── search/              # 搜索页组件
 │   │   ├── SearchBar.vue    # 搜索栏（关键词 + 四项复选筛选 + 分页）
 │   │   ├── ClassList.vue    # 搜索结果布局门面（按 layout 分发）
@@ -425,7 +435,7 @@ src/
 
 | Store | 职责 | 现状 |
 | --- | --- | --- |
-| `uiStore` | 当前学期（`currentSemester`）、可用学期列表、副栏展开状态 | 已实现 |
+| `uiStore` | 当前学期（`currentSemester`）、可用学期列表、窄屏副栏展开状态（`sidebarOpen`） | 已实现 |
 | `searchStore` | 搜索与筛选条件（关键词、四项选中值、分页），**与学期解耦** | 已实现 |
 | `markStore` | **当前方案**的标记（意向/已排），读写 IndexedDB，按需回查教学班详情 | 已实现 |
 | `planStore` | 当前学期的方案列表、当前方案、方案增删改名 | 已实现 |
